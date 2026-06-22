@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>苏小智</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <!-- 1. CSS 兜底：系统偏好 → 即使 JS 未执行也不会白屏 -->
+    <style>
+      html {
+        background-color: #0b1533;
+        color: #e4eaf5;
+      }
+      body {
+        background-color: #0b1533;
+        min-height: 100vh;
+      }
+      #app {
+        background-color: #0b1533;
+        min-height: 100vh;
+      }
+      @media (prefers-color-scheme: light) {
+        html {
+          background-color: #eef3f8;
+          color: #1f2937;
+        }
+        body {
+          background-color: #eef3f8;
+        }
+        #app {
+          background-color: #eef3f8;
+        }
+      }
+    </style>
+    <!-- 2. JS 精确控制：读取 localStorage 覆盖系统偏好 -->
+    <script>
+      ;(function () {
+        var KEY = 'app_theme_mode'
+        var stored = localStorage.getItem(KEY)
+        var isDark
+        if (stored === 'dark') isDark = true
+        else if (stored === 'light') isDark = false
+        else return // 跟随系统，上面的 <style> 已处理
+
+        var root = document.documentElement
+        if (isDark) {
+          root.dataset.theme = 'dark'
+          root.classList.add('dark')
+          root.style.colorScheme = 'dark'
+        } else {
+          // 用户选了浅色，覆盖 <style> 的暗色默认
+          root.style.backgroundColor = '#eef3f8'
+          root.style.color = '#1f2937'
+          document.body && (document.body.style.backgroundColor = '#eef3f8')
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="/lib/d3.v7.min.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,91 @@
+# Nginx 反向代理配置示例
+# 将此配置添加到你的 Nginx 配置文件中（通常在 /etc/nginx/conf.d/ 或 sites-available/）
+
+server {
+    listen 811;
+    server_name localhost;
+    
+    # 前端静态文件根目录（修改为你的实际路径）
+    root /path/to/ai-assistant/dist;
+    index index.html;
+    
+    # ✅ 聊天 API 代理 - 关键配置
+    location /chatApi/ {
+        # 去除 /chatApi 前缀，转发到后端服务
+        proxy_pass http://10.32.71.223:19000/;
+        
+        # 必要的请求头
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 支持（流式响应需要）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        # 超时设置（根据实际需求调整）
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # 缓冲设置（流式响应建议关闭缓冲）
+        proxy_buffering off;
+    }
+    
+    # ✅ 历史记录 API 代理 - 解决跨域问题
+    location /historyApi/ {
+        # 去除 /historyApi 前缀，转发到历史记录服务
+        proxy_pass http://50.18.22.93:9090/;
+        
+        # 必要的请求头
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 超时设置
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+
+    # 可选：仅当 VITE_QBPT_PAGE_URL 留空、需要同源 /qbpt/... 时启用
+    # 当前推荐直接让前端打开 180 上的页面代理：https://50.18.22.180:815/qbpt/...
+    location /qbpt/ {
+        proxy_pass http://50.18.22.180:8083/qbpt/;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect http://50.18.22.180:8083/ /;
+        proxy_cookie_domain 50.18.22.180 $host;
+        proxy_cookie_path / /;
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types text/html text/css application/javascript text/javascript application/json;
+        sub_filter 'http://50.18.22.180:88083' 'https://50.18.22.180:815';
+        sub_filter 'http://50.18.22.180:8083' 'https://50.18.22.180:815';
+    }
+    
+    # ⚠️ 注意：功能接口（VITE_FUNCTION_API_BASE）直接调用后端服务，不经过 Nginx 代理
+    # 如果需要代理功能接口，取消下面的注释并配置正确的后端地址
+    # location /api/ {
+    #     proxy_pass http://50.18.22.180:8083/;
+    #     proxy_set_header Host $host;
+    #     proxy_set_header X-Real-IP $remote_addr;
+    #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # }
+    
+    # ✅ 前端路由 fallback（Vue Router history 模式必需）
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # 可选：静态资源缓存优化
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
