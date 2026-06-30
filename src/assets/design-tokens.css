@@ -1,0 +1,2176 @@
+/* ================================================================
+   design-tokens.css — 新产品设计令牌（MCP/数字警员/安全管理/安全审计/我的权限）
+   不影响 base.css，通过 .ds-page-wrapper 作用域隔离
+   ================================================================ */
+
+/* ==================== 基础设计令牌（全局可用，el-dialog teleport 也需要） ==================== */
+:root {
+  /* 主色系 */
+  --ds-primary: #1a3a6b;
+  --ds-primary-light: #2a5aa0;
+  --ds-primary-dark: #0e2240;
+  --ds-primary-soft: rgba(26, 58, 107, 0.08);
+  --ds-primary-softer: rgba(26, 58, 107, 0.04);
+
+  /* 强调色 */
+  --ds-accent: #c9a84c;
+  --ds-accent-light: #e0c570;
+  --ds-accent-soft: rgba(201, 168, 76, 0.08);
+
+  /* 表面色 */
+  --ds-bg: #f0f2f5;
+  --ds-card: #ffffff;
+  --ds-panel: #ffffff;
+  --ds-panel-muted: #f7f8fa;
+
+  /* 文字 */
+  --ds-text: #1a1a1a;
+  --ds-text-secondary: #666666;
+  --ds-text-subtle: #999999;
+
+  /* 边框 */
+  --ds-border: #d9dde4;
+  --ds-border-hover: #b0b8c4;
+
+  /* 语义色 */
+  --ds-success: #2e7d32;
+  --ds-success-soft: #e8f5e9;
+  --ds-danger: #c62828;
+  --ds-danger-soft: #fce4ec;
+  --ds-warning: #e65100;
+  --ds-warning-soft: #fff3e0;
+  --ds-info: #1565c0;
+  --ds-info-soft: #e3f2fd;
+
+  /* 字体 */
+  --ds-font: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif;
+  --ds-font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+
+  /* 圆角 */
+  --ds-radius-card: 12px;
+  --ds-radius-btn: 8px;
+  --ds-radius-input: 8px;
+  --ds-radius-tag: 4px;
+  --ds-radius-chip: 20px;
+
+  /* 阴影 */
+  --ds-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
+  --ds-shadow-card-hover: 0 4px 8px rgba(26, 58, 107, 0.06), 0 12px 32px rgba(26, 58, 107, 0.1);
+  --ds-shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+  /* 过渡 */
+  --ds-transition: 0.2s ease;
+}
+
+/* 页面作用域限定：仅在 ds-page-wrapper 内应用字体和文字色 */
+.ds-page-wrapper {
+  font-family: var(--ds-font);
+  color: var(--ds-text);
+}
+
+/* ==================== 分区标签 ==================== */
+.ds-section-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--ds-border);
+}
+
+.ds-section-tab {
+  padding: 10px 22px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  color: var(--ds-text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--ds-transition);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-section-tab:hover {
+  color: var(--ds-text);
+}
+
+.ds-section-tab.active {
+  color: var(--ds-primary);
+  border-bottom-color: var(--ds-primary);
+  font-weight: 600;
+}
+
+.ds-section-tab .count {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  margin-left: 4px;
+}
+
+/* ==================== 分区面板 ==================== */
+.ds-section-panel {
+  /* 由 v-show 控制显示 */
+}
+
+.ds-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ds-section-head h3 {
+  font-size: 15px;
+  color: var(--ds-primary);
+  font-weight: 600;
+  margin: 0;
+}
+
+.ds-section-subtitle {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+/* ==================== 页面标题 ==================== */
+.ds-page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ds-primary);
+  margin: 0 0 20px 0;
+}
+
+.ds-page-desc {
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.7;
+}
+
+.ds-page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.ds-page-title-row .ds-page-title {
+  margin: 0;
+}
+
+/* ==================== 页面内容容器（仿新产品 max-width 居中布局） ==================== */
+.ds-page-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ds-page-container--narrow {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ==================== 搜索 & 筛选工具栏 ==================== */
+.ds-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ds-search-input {
+  padding: 8px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 13px;
+  width: 240px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+  transition: border-color var(--ds-transition);
+}
+
+.ds-search-input:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+.ds-search-input::placeholder {
+  color: var(--ds-text-subtle);
+}
+
+.ds-form-input {
+  padding: 8px 14px;
+  height: 38px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 13px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+  transition: border-color var(--ds-transition);
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.ds-form-input:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+  box-shadow: 0 0 0 2px var(--ds-primary-softer);
+}
+
+.ds-form-input::placeholder {
+  color: var(--ds-text-subtle);
+}
+
+.ds-search-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-search-group .ds-search-input {
+  width: 220px;
+}
+
+.ds-select {
+  padding: 8px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 13px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+  cursor: pointer;
+  transition: border-color var(--ds-transition);
+}
+
+.ds-select:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+/* ==================== 筛选行（审计页用） ==================== */
+.ds-filter-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ==================== 卡片网格 ==================== */
+.ds-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* ==================== 基础卡片 ==================== */
+.ds-card {
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-card:hover {
+  box-shadow: var(--ds-shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.ds-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.ds-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--ds-text);
+}
+
+.ds-card-desc {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  line-height: 1.6;
+  flex: 1;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ds-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.ds-card-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ds-card-tag--skill {
+  background: var(--ds-info-soft);
+  color: var(--ds-info);
+}
+
+.ds-card-tag--mcp {
+  background: var(--ds-warning-soft);
+  color: var(--ds-warning);
+}
+
+.ds-card-tag--category {
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
+}
+
+.ds-card-status {
+  margin-bottom: 10px;
+}
+
+.ds-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 10px;
+  /* border-top: 1px solid var(--ds-border); */
+}
+
+/* ==================== 标签/徽章 ==================== */
+.ds-tag-approved {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-success-soft);
+  color: var(--ds-success);
+}
+
+.ds-tag-pending {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-warning-soft);
+  color: var(--ds-warning);
+}
+
+.ds-tag-rejected {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-danger-soft);
+  color: var(--ds-danger);
+}
+
+.ds-tag-success {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-success-soft);
+  color: var(--ds-success);
+}
+
+.ds-tag-warning {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-warning-soft);
+  color: var(--ds-warning);
+}
+
+.ds-tag-info {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-tag);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
+}
+
+/* ==================== 风险标签 ==================== */
+.ds-risk-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ds-risk-low {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.ds-risk-mid {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ds-risk-high {
+  background: #fce4ec;
+  color: #c62828;
+  font-weight: 700;
+}
+
+/* ==================== 审批标签 ==================== */
+.ds-approval-pending {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ds-approval-approved {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.ds-approval-rejected {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+/* ==================== 按钮变体 ==================== */
+.ds-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  background: var(--ds-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--ds-radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-btn-primary:hover {
+  background: var(--ds-primary-light);
+}
+
+.ds-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  background: #fff;
+  color: var(--ds-primary);
+  border: 1px solid var(--ds-primary);
+  border-radius: var(--ds-radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-btn-outline:hover {
+  background: var(--ds-primary-soft);
+}
+
+.ds-btn-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  background: var(--ds-success);
+  color: #fff;
+  border: none;
+  border-radius: var(--ds-radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-btn-success:hover {
+  background: #388e3c;
+}
+
+.ds-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  background: var(--ds-danger);
+  color: #fff;
+  border: none;
+  border-radius: var(--ds-radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-btn-danger:hover {
+  background: #d32f2f;
+}
+
+/* 小按钮 */
+.ds-btn-mini-primary {
+  padding: 5px 12px;
+  background: var(--ds-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--ds-transition);
+  font-family: var(--ds-font);
+}
+
+.ds-btn-mini-primary:hover {
+  background: var(--ds-primary-light);
+}
+
+.ds-btn-mini-outline {
+  padding: 5px 12px;
+  background: #fff;
+  color: var(--ds-primary);
+  border: 1px solid var(--ds-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+}
+
+.ds-btn-mini-outline:hover {
+  background: var(--ds-primary-soft);
+}
+
+.ds-btn-mini-danger {
+  padding: 5px 12px;
+  background: #fff;
+  color: var(--ds-danger);
+  border: 1px solid var(--ds-danger);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+}
+
+.ds-btn-mini-danger:hover {
+  background: var(--ds-danger-soft);
+}
+
+.ds-btn-link {
+  background: none;
+  border: none;
+  color: var(--ds-primary-light);
+  font-size: 12px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-family: var(--ds-font);
+}
+
+.ds-btn-link:hover {
+  text-decoration: underline;
+}
+
+.ds-btn-link--danger {
+  color: var(--ds-danger);
+}
+
+/* ==================== AI智能体切换按钮 ==================== */
+.ds-agent-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--ds-primary), var(--ds-primary-light));
+  color: #fff;
+  border: none;
+  border-radius: var(--ds-radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  white-space: nowrap;
+  font-family: var(--ds-font);
+}
+
+.ds-agent-toggle:hover {
+  box-shadow: 0 2px 10px rgba(26, 58, 107, 0.3);
+}
+
+/* ==================== 表格 ==================== */
+.ds-table-wrap {
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  padding: 0;
+  border: 1px solid var(--ds-border);
+  overflow: hidden;
+}
+
+.ds-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ds-table th {
+  background: var(--ds-primary);
+  color: #fff;
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ds-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ds-border);
+  font-size: 13px;
+  vertical-align: middle;
+  color: var(--ds-text);
+}
+
+.ds-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ds-table tr:hover td {
+  background: var(--ds-primary-softer);
+}
+
+.ds-table input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.ds-table .ds-empty-cell {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ds-text-secondary);
+}
+
+/* 高风险行 */
+.ds-risk-high-row td {
+  background: rgba(198, 40, 40, 0.04);
+}
+
+.ds-risk-high-row td:first-child {
+  border-left: 3px solid var(--ds-danger);
+}
+
+/* ==================== 空状态 ==================== */
+.ds-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
+}
+
+/* ==================== 提示词预览 ==================== */
+.ds-prompt-preview {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--ds-bg);
+  border-left: 3px solid var(--ds-primary-light);
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-height: 80px;
+  overflow-y: auto;
+  font-family: var(--ds-font-mono);
+}
+
+.ds-prompt-preview summary {
+  cursor: pointer;
+  font-family: var(--ds-font);
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.ds-prompt-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ==================== 权限芯片 ==================== */
+.ds-myperm-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.ds-perm-chip {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ds-perm-chip--skill {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.ds-perm-chip--mcp {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.ds-perm-chip--officer {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.ds-perm-chip--disabled {
+  background: #f5f5f5;
+  color: #bbb;
+  text-decoration: line-through;
+}
+
+/* ==================== 布局：左侧内容 + 右侧面板 ==================== */
+.ds-layout-split {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+}
+
+.ds-layout-left {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.ds-layout-right {
+  width: 400px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  border: 1px solid var(--ds-border);
+  overflow: hidden;
+  transition:
+    width 0.3s ease,
+    opacity 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.ds-layout-right.collapsed {
+  width: 0;
+  opacity: 0;
+  border-color: transparent;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ==================== AI智能体聊天面板 ==================== */
+.ds-agent-header {
+  padding: 12px 18px;
+  background: var(--ds-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ds-agent-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--ds-accent);
+  color: var(--ds-primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ds-agent-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ds-agent-sub {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ds-agent-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ds-agent-close:hover {
+  opacity: 1;
+}
+
+.ds-agent-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--ds-bg);
+}
+
+.ds-agent-msg {
+  display: flex;
+  gap: 8px;
+  max-width: 92%;
+}
+
+.ds-agent-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.ds-agent-msg .ds-agent-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ds-agent-msg.ai .ds-agent-msg-avatar {
+  background: var(--ds-primary);
+  color: var(--ds-accent);
+}
+
+.ds-agent-msg.user .ds-agent-msg-avatar {
+  background: var(--ds-accent);
+  color: var(--ds-primary-dark);
+}
+
+.ds-agent-msg .ds-agent-msg-bubble {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.ds-agent-msg.ai .ds-agent-msg-bubble {
+  background: var(--ds-panel-muted);
+  border: 1px solid var(--ds-border);
+  border-radius: 2px 8px 8px 8px;
+}
+
+.ds-agent-msg.user .ds-agent-msg-bubble {
+  background: var(--ds-primary);
+  color: #fff;
+  border-radius: 8px 2px 8px 8px;
+}
+
+.ds-agent-input {
+  padding: 10px 14px;
+  border-top: 1px solid var(--ds-border);
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--ds-card);
+}
+
+.ds-agent-input input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 13px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+}
+
+.ds-agent-input input:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+.ds-agent-input button {
+  width: 38px;
+  height: 38px;
+  background: var(--ds-primary);
+  border: none;
+  border-radius: var(--ds-radius-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #fff;
+}
+
+.ds-agent-input button:hover {
+  background: var(--ds-primary-light);
+}
+
+/* 建议问题 */
+.ds-sq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ds-sq-chip {
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid var(--ds-primary-light);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--ds-primary-light);
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  font-family: var(--ds-font);
+}
+
+.ds-sq-chip:hover {
+  background: var(--ds-primary-light);
+  color: #fff;
+}
+
+/* ==================== 管理标签 ==================== */
+.ds-mgmt-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--ds-border);
+}
+
+.ds-mgmt-tab {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--ds-transition);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--ds-font);
+  white-space: nowrap;
+}
+
+.ds-mgmt-tab:hover {
+  color: var(--ds-text);
+}
+
+.ds-mgmt-tab.active {
+  color: var(--ds-primary);
+  border-bottom-color: var(--ds-primary);
+  font-weight: 600;
+}
+
+.ds-approval-badge {
+  background: var(--ds-danger);
+  color: #fff;
+  font-size: 10px;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 4px;
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  line-height: 18px;
+}
+
+/* ==================== 角色卡片 ==================== */
+.ds-role-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.ds-role-card {
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+}
+
+.ds-role-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ds-role-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.ds-role-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.ds-role-count {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+}
+
+.ds-role-perms {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ds-role-perms li {
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  border-bottom: 1px solid var(--ds-border);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.ds-role-perms li:last-child {
+  border-bottom: none;
+}
+
+.ds-role-perms li::before {
+  content: '✓';
+  color: var(--ds-success);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ==================== 审批卡片 ==================== */
+.ds-approval-panel {
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+}
+
+.ds-approval-panel h3 {
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: var(--ds-primary);
+}
+
+.ds-approval-desc {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  margin-bottom: 16px;
+}
+
+.ds-approval-card {
+  background: var(--ds-card);
+  border-radius: 10px;
+  padding: 16px;
+  border: 1px solid var(--ds-border);
+  margin-bottom: 12px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.ds-approval-card:last-child {
+  margin-bottom: 0;
+}
+
+.ds-approval-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.ds-approval-body {
+  flex: 1;
+}
+
+.ds-approval-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--ds-text);
+}
+
+.ds-approval-stage {
+  font-size: 11px;
+  color: var(--ds-accent);
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.ds-approval-meta {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  margin-bottom: 6px;
+  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.ds-approval-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ds-btn-approve {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  background: var(--ds-success);
+  color: #fff;
+  font-family: var(--ds-font);
+}
+
+.ds-btn-approve:hover {
+  background: #388e3c;
+}
+
+.ds-btn-reject {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--ds-danger);
+  background: #fff;
+  color: var(--ds-danger);
+  font-family: var(--ds-font);
+}
+
+.ds-btn-reject:hover {
+  background: var(--ds-danger-soft);
+}
+
+.ds-btn-approve:disabled,
+.ds-btn-reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==================== 审批筛选芯片 ==================== */
+.audit-chip-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.audit-chip {
+  padding: 5px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 16px;
+  background: var(--ds-card);
+  color: var(--ds-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--ds-font);
+}
+
+.audit-chip:hover {
+  border-color: var(--ds-primary-light);
+  color: var(--ds-primary);
+}
+
+.audit-chip--active {
+  background: var(--ds-primary);
+  color: #fff;
+  border-color: var(--ds-primary);
+}
+
+/* ==================== 部门表格操作 ==================== */
+.ds-dept-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ds-dept-name {
+  font-weight: 600;
+  color: var(--ds-primary);
+}
+
+.ds-dept-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+/* ==================== 我的权限面板 ==================== */
+.ds-myperm-panel {
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-card);
+  padding: 20px;
+  border: 1px solid var(--ds-border);
+  margin-bottom: 20px;
+}
+
+.ds-myperm-panel h3 {
+  font-size: 15px;
+  color: var(--ds-primary);
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.ds-myperm-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ds-myperm-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--ds-primary);
+  color: var(--ds-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.ds-myperm-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ds-text);
+}
+
+.ds-myperm-role {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  font-weight: 400;
+}
+
+.ds-myperm-meta {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  margin-top: 2px;
+}
+
+.ds-myperm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ds-myperm-stat {
+  background: var(--ds-bg);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.ds-myperm-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ds-primary);
+}
+
+.ds-myperm-lbl {
+  font-size: 11px;
+  color: var(--ds-text-secondary);
+  margin-top: 2px;
+}
+
+/* ==================== 模态框 ==================== */
+.ds-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 24px 24px;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+}
+
+.ds-modal-box {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  height: auto;
+  max-height: 90vh;
+  box-shadow: var(--ds-shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ==================== Element Plus el-dialog 统一弹窗样式（通过 class="ds-modal" 激活） ==================== */
+
+/* 锁定遮罩层，禁止遮罩层自身滚动 */
+.el-overlay:has(.el-dialog.ds-modal) {
+  overflow: hidden !important;
+}
+.el-overlay:has(.el-dialog.ds-modal) .el-overlay-dialog {
+  display: flex !important;
+  justify-content: center !important;
+  padding: 0 24px 24px;
+  box-sizing: border-box;
+  overflow: hidden !important;
+}
+
+.el-dialog.ds-modal {
+  --el-dialog-bg-color: #ffffff;
+  --el-dialog-border-radius: 14px;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  margin: 80px auto 0 auto !important;
+  background: #ffffff;
+  border-radius: 14px;
+  max-width: 680px;
+  max-height: 90vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.el-dialog.ds-modal .el-dialog__header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--ds-border);
+  margin-right: 0;
+  flex-shrink: 0;
+}
+
+.el-dialog.ds-modal .el-dialog__title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--ds-primary) !important;
+}
+
+.el-dialog.ds-modal .el-dialog__headerbtn {
+  top: 14px;
+  right: 20px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--ds-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.el-dialog.ds-modal .el-dialog__headerbtn .el-dialog__close {
+  color: var(--ds-text-secondary);
+  font-size: 16px;
+}
+
+.el-dialog.ds-modal .el-dialog__headerbtn:hover {
+  background: var(--ds-bg);
+}
+
+.el-dialog.ds-modal .el-dialog__body {
+  padding: 20px 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.el-dialog.ds-modal .el-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--ds-border);
+  flex-shrink: 0;
+}
+
+/* 表单元素 */
+.el-dialog.ds-modal .el-form-item {
+  margin-bottom: 16px;
+}
+
+.el-dialog.ds-modal .el-form-item__label {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.el-dialog.ds-modal .el-input__wrapper {
+  border-radius: 8px;
+  background: var(--ds-panel-muted);
+  border-color: var(--ds-border);
+  box-shadow: none;
+  padding: 0 14px;
+  height: 42px;
+}
+
+.el-dialog.ds-modal .el-input__wrapper:hover {
+  border-color: var(--ds-primary-light);
+}
+
+.el-dialog.ds-modal .el-input__wrapper.is-focus {
+  border-color: var(--ds-primary-light);
+  box-shadow: 0 0 0 2px var(--ds-primary-softer);
+}
+
+.el-dialog.ds-modal .el-input__inner {
+  font-size: 14px;
+  color: var(--ds-text);
+  font-family: var(--ds-font);
+}
+
+.el-dialog.ds-modal .el-input__inner::placeholder {
+  color: var(--ds-text-subtle);
+}
+
+.el-dialog.ds-modal .el-textarea__inner {
+  border-radius: 8px;
+  background: var(--ds-panel-muted);
+  border-color: var(--ds-border);
+  font-size: 14px;
+  color: var(--ds-text);
+  font-family: var(--ds-font);
+  padding: 10px 14px;
+  box-shadow: none;
+  resize: vertical;
+}
+
+.el-dialog.ds-modal .el-textarea__inner:hover {
+  border-color: var(--ds-primary-light);
+}
+
+.el-dialog.ds-modal .el-textarea__inner:focus {
+  border-color: var(--ds-primary-light);
+  box-shadow: 0 0 0 2px var(--ds-primary-softer);
+}
+
+.el-dialog.ds-modal .el-select .el-input__wrapper {
+  border-radius: 8px;
+  background: var(--ds-panel-muted);
+  border-color: var(--ds-border);
+  box-shadow: none;
+  height: 42px;
+}
+
+/* 底部按钮 */
+.el-dialog.ds-modal .el-dialog__footer .el-button {
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--ds-font);
+  min-height: 42px;
+}
+
+.el-dialog.ds-modal .el-dialog__footer .el-button--default {
+  border: 1px solid var(--ds-border);
+  background: #ffffff;
+  color: var(--ds-text-secondary);
+}
+
+.el-dialog.ds-modal .el-dialog__footer .el-button--default:hover {
+  background: var(--ds-bg);
+}
+
+.el-dialog.ds-modal .el-dialog__footer .el-button--primary {
+  border: none;
+  background: var(--ds-primary);
+  color: #fff;
+}
+
+.el-dialog.ds-modal .el-dialog__footer .el-button--primary:hover {
+  background: var(--ds-primary-light);
+}
+
+.el-dialog.ds-modal .el-dialog__footer .el-button--primary.is-disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* 深色模式 */
+:root[data-theme='dark'] .el-dialog.ds-modal {
+  --el-dialog-bg-color: #101d3a;
+  background: #101d3a;
+}
+
+:root[data-theme='dark'] .el-dialog.ds-modal .el-dialog__headerbtn {
+  border-color: rgba(0, 170, 255, 0.2);
+}
+
+:root[data-theme='dark'] .el-dialog.ds-modal .el-dialog__headerbtn:hover {
+  background: rgba(0, 170, 255, 0.1);
+}
+
+:root[data-theme='dark'] .el-dialog.ds-modal .el-dialog__footer .el-button--default {
+  background: #1a2a4a;
+  border-color: var(--ds-border);
+}
+
+:root[data-theme='dark'] .el-dialog.ds-modal .el-dialog__footer .el-button--default:hover {
+  background: #243456;
+}
+
+:root[data-theme='dark'] .el-dialog.ds-modal .el-input__wrapper,
+:root[data-theme='dark'] .el-dialog.ds-modal .el-textarea__inner,
+:root[data-theme='dark'] .el-dialog.ds-modal .el-select .el-input__wrapper {
+  background: rgba(18, 34, 72, 0.5);
+  border-color: var(--ds-border);
+}
+
+.ds-modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--ds-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.ds-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ds-primary);
+  margin: 0;
+}
+
+.ds-modal-close {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid var(--ds-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  transition: all var(--ds-transition);
+  flex-shrink: 0;
+}
+
+.ds-modal-close:hover {
+  background: var(--ds-bg);
+  color: var(--ds-text);
+}
+
+.ds-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.ds-modal-body label {
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  font-weight: 500;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.ds-modal-body input[type='text'],
+.ds-modal-body input[type='number'],
+.ds-modal-body input[type='url'],
+.ds-modal-body input[type='date'] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 14px;
+  margin-bottom: 16px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+}
+
+.ds-modal-body input:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+.ds-modal-body select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 14px;
+  margin-bottom: 16px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+}
+
+.ds-modal-body textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  font-size: 14px;
+  margin-bottom: 16px;
+  resize: vertical;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+  min-height: 60px;
+}
+
+.ds-modal-body textarea:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+.ds-modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--ds-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.ds-btn-cancel {
+  padding: 9px 20px;
+  border: 1px solid var(--ds-border);
+  background: var(--ds-card);
+  border-radius: var(--ds-radius-btn);
+  font-size: 14px;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  font-family: var(--ds-font);
+}
+
+.ds-btn-cancel:hover {
+  background: var(--ds-bg);
+}
+
+.ds-btn-confirm {
+  padding: 9px 20px;
+  border: none;
+  background: var(--ds-primary);
+  border-radius: var(--ds-radius-btn);
+  font-size: 14px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--ds-font);
+}
+
+.ds-btn-confirm:hover {
+  background: var(--ds-primary-light);
+}
+
+.ds-btn-confirm:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.ds-form-group {
+  margin-bottom: 16px;
+}
+
+.ds-form-label {
+  display: block;
+  font-size: 13px;
+  color: var(--ds-text-secondary);
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.ds-form-label .ds-required {
+  color: var(--ds-danger);
+}
+
+.ds-form-group input,
+.ds-form-group select,
+.ds-form-group textarea {
+  width: 100%;
+  padding: 9px 13px;
+  border: 1px solid var(--ds-border);
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: var(--ds-font);
+  background: var(--ds-card);
+  color: var(--ds-text);
+  transition: border-color var(--ds-transition);
+}
+
+.ds-form-group input:focus,
+.ds-form-group select:focus,
+.ds-form-group textarea:focus {
+  outline: none;
+  border-color: var(--ds-primary-light);
+}
+
+.ds-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+}
+
+.ds-form-grid .ds-form-group.full {
+  grid-column: 1 / -1;
+}
+
+/* ==================== 多选标签 ==================== */
+.ds-pick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-input);
+  min-height: 44px;
+  background: var(--ds-card);
+}
+
+.ds-pick-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--ds-bg);
+  border: 1px solid var(--ds-border);
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--ds-font);
+  user-select: none;
+}
+
+.ds-pick-item:hover {
+  border-color: var(--ds-primary-light);
+}
+
+.ds-pick-item.selected {
+  background: var(--ds-primary);
+  color: #fff;
+  border-color: var(--ds-primary);
+}
+
+/* ==================== 动画 ==================== */
+@keyframes ds-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ds-fade-in {
+  animation: ds-fade-in 0.25s ease-out;
+}
+
+/* ==================== Toast 提示 ==================== */
+.ds-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 14px 24px;
+  background: var(--ds-primary);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 9999;
+  transform: translateX(120%);
+  transition: transform 0.3s ease;
+  font-family: var(--ds-font);
+}
+
+.ds-toast.show {
+  transform: translateX(0);
+}
+
+/* ==================== 深色模式覆盖 ==================== */
+:root[data-theme='dark'] {
+  --ds-primary: #00aaff;
+  --ds-primary-light: #33bbff;
+  --ds-primary-dark: #0088cc;
+  --ds-primary-soft: rgba(0, 170, 255, 0.12);
+  --ds-primary-softer: rgba(0, 170, 255, 0.05);
+  --ds-accent: #e0c570;
+  --ds-accent-light: #f0d880;
+  --ds-accent-soft: rgba(224, 197, 112, 0.08);
+  --ds-bg: #0b1533;
+  --ds-card: rgba(18, 34, 72, 0.7);
+  --ds-panel: rgba(18, 34, 72, 0.7);
+  --ds-panel-muted: rgba(12, 24, 52, 0.5);
+  --ds-text: #e4eaf5;
+  --ds-text-secondary: rgba(190, 210, 240, 0.65);
+  --ds-text-subtle: rgba(160, 185, 220, 0.45);
+  --ds-border: rgba(0, 170, 255, 0.2);
+  --ds-border-hover: rgba(0, 170, 255, 0.35);
+
+  --ds-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.12);
+  --ds-shadow-card-hover: 0 2px 4px rgba(0, 170, 255, 0.08), 0 16px 36px rgba(0, 0, 0, 0.22);
+  --ds-shadow-modal: 0 4px 16px rgba(0, 0, 0, 0.3), 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='dark'] .ds-table th {
+  background: rgba(0, 170, 255, 0.2);
+}
+
+:root[data-theme='dark'] .ds-risk-low {
+  background: rgba(46, 125, 50, 0.2);
+  color: #66bb6a;
+}
+
+:root[data-theme='dark'] .ds-risk-mid {
+  background: rgba(230, 81, 0, 0.2);
+  color: #ffa726;
+}
+
+:root[data-theme='dark'] .ds-risk-high {
+  background: rgba(198, 40, 40, 0.2);
+  color: #ef5350;
+}
+
+:root[data-theme='dark'] .ds-perm-chip--skill {
+  background: rgba(21, 101, 192, 0.2);
+  color: #64b5f6;
+}
+
+:root[data-theme='dark'] .ds-perm-chip--mcp {
+  background: rgba(230, 81, 0, 0.2);
+  color: #ffa726;
+}
+
+:root[data-theme='dark'] .ds-perm-chip--officer {
+  background: rgba(198, 40, 40, 0.2);
+  color: #ef5350;
+}
+
+:root[data-theme='dark'] .ds-agent-msg.ai .ds-agent-msg-bubble {
+  background: var(--ds-panel-muted);
+  border-color: var(--ds-border);
+}
+
+:root[data-theme='dark'] .ds-prompt-preview {
+  background: var(--ds-panel-muted);
+}
+
+:root[data-theme='dark'] .ds-sq-chip {
+  background: var(--ds-card);
+  border-color: rgba(0, 170, 255, 0.3);
+  color: var(--ds-primary-light);
+}
+
+:root[data-theme='dark'] .ds-sq-chip:hover {
+  background: var(--ds-primary);
+  color: #fff;
+}
+
+:root[data-theme='dark'] .ds-pick-item {
+  background: var(--ds-panel-muted);
+  border-color: var(--ds-border);
+}
+
+/* 模态框深色模式 */
+:root[data-theme='dark'] .ds-modal-box {
+  background: #101d3a;
+}
+
+:root[data-theme='dark'] .ds-btn-cancel {
+  background: #1a2a4a;
+  color: var(--ds-text-secondary);
+}
+
+:root[data-theme='dark'] .ds-btn-cancel:hover {
+  background: #243456;
+}
+
+/* ==================== 页面外层容器 ==================== */
+/* 每个改造页面使用此作为根容器 */
+.ds-page {
+  padding: 24px;
+  height: 100%;
+  overflow-y: auto;
+  background: var(--ds-bg);
+}
+
+/* ==================== 响应式 ==================== */
+
+/* 平板 (≤1024px) */
+@media (max-width: 1024px) {
+  .ds-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .ds-role-cards {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .ds-layout-right {
+    width: 360px;
+  }
+
+  .ds-myperm-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 小平板 / 大手机 (≤768px) */
+@media (max-width: 768px) {
+  .ds-page {
+    padding: 16px;
+  }
+
+  .ds-card-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .ds-role-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-section-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .ds-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-search-input {
+    width: 100%;
+  }
+
+  .ds-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-filter-row select,
+  .ds-filter-row input {
+    width: 100%;
+  }
+
+  .ds-layout-split {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .ds-layout-right {
+    width: 100%;
+    max-height: 400px;
+  }
+
+  .ds-layout-right.collapsed {
+    width: 0;
+    max-height: 0;
+  }
+
+  .ds-myperm-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .ds-dept-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ds-mgmt-tab {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .ds-page-title {
+    font-size: 18px;
+  }
+
+  .ds-modal-box {
+    max-width: 95vw;
+    max-height: 90vh;
+  }
+
+  .ds-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-table-wrap {
+    overflow-x: auto;
+  }
+}
+
+/* 手机 (≤480px) */
+@media (max-width: 480px) {
+  .ds-page {
+    padding: 12px;
+  }
+
+  .ds-card {
+    padding: 14px;
+  }
+
+  .ds-card-grid {
+    gap: 10px;
+  }
+
+  .ds-section-tabs {
+    gap: 2px;
+  }
+
+  .ds-section-tab {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .ds-mgmt-tabs {
+    gap: 2px;
+  }
+
+  .ds-mgmt-tab {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .ds-myperm-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-myperm-stat {
+    padding: 10px 12px;
+  }
+
+  .ds-myperm-num {
+    font-size: 16px;
+  }
+
+  .ds-modal-header,
+  .ds-modal-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .ds-modal-footer {
+    padding: 12px 16px;
+    flex-direction: column;
+  }
+
+  .ds-modal-footer button {
+    width: 100%;
+  }
+
+  /* 确保移动端最小16px字号防止iOS缩放 */
+  .ds-page-wrapper {
+    font-size: 14px;
+  }
+
+  .ds-card-name {
+    font-size: 14px;
+  }
+
+  .ds-card-desc {
+    font-size: 13px;
+  }
+}

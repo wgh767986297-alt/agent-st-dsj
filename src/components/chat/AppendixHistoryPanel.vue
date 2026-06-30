@@ -521,7 +521,7 @@ defineExpose({
                     <el-tooltip content="查看" placement="top">
                       <el-button
                         size="small"
-                        type="text"
+                        link
                         class="action-btn view-btn"
                         @click="handlePreview(item)"
                       >
@@ -532,7 +532,7 @@ defineExpose({
                     <el-tooltip content="引用" placement="top">
                       <el-button
                         size="small"
-                        type="text"
+                        link
                         class="action-btn quote-btn"
                         @click="handleQuote(item)"
                       >
@@ -543,7 +543,7 @@ defineExpose({
                     <el-tooltip content="删除" placement="top">
                       <el-button
                         size="small"
-                        type="text"
+                        link
                         class="action-btn delete-btn"
                         @click="handleDelete(item)"
                       >

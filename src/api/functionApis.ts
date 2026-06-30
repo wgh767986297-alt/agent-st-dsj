@@ -1,39 +1,4 @@
 import type { FunctionApiConfig } from '@/types/api'
-import axios from 'axios'
-import { handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
-
-// ✅ 创建情报池 API 实例
-const qbcApi = axios.create({
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  // ✅ 关键配置：允许携带和发送 Cookie
-  withCredentials: true,
-})
-
-// ✅ 响应拦截器 - 处理 401 未认证
-qbcApi.interceptors.response.use(
-  (response) => {
-    if (isAuthExpiredResponse(response.data, response.status)) {
-      handleAuthExpired()
-      return Promise.reject(new Error(response.data?.message || 'token已过期'))
-    }
-
-    return response
-  },
-  (error) => {
-
-
-    // 如果后端返回 401 未认证,跳转到登录页
-    if (isAuthExpiredResponse(error.response?.data, error.response?.status)) {
-
-      handleAuthExpired()
-    }
-
-    return Promise.reject(error)
-  },
-)
 
 // 功能API配置
 // 注意：Authorization token需要从环境变量或配置文件中获取
@@ -129,28 +94,4 @@ export const functionApiConfigs: Record<string, FunctionApiConfig> = {
 // 根据ID获取API配置
 export const getApiConfig = (id: string): FunctionApiConfig | undefined => {
   return functionApiConfigs[id]
-}
-
-// ✅ 获取情报池统计数据
-export const getQbcCountList = async () => {
-  try {
-    const apiUrl = import.meta.env.VITE_API_URL || ''
-    const url = `${apiUrl}/qbpt/znt/getQbcCountList.xhtml`
-
-
-
-    const response = await qbcApi.get(url)
-
-    if (response.data) {
-
-      // 存储到 localStorage
-      localStorage.setItem('qbcData', JSON.stringify(response.data))
-      return response.data
-    }
-
-    return null
-  } catch (error) {
-
-    return null
-  }
 }

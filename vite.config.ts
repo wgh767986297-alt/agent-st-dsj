@@ -56,12 +56,6 @@ export default defineConfig(({ mode }) => {
           secure: false,
           rewrite: (path) => path.replace(/^\/chatApi/, ''),
         },
-        '^/knowledgeApi(/.*)?$': {
-          target: env.VITE_KNOWLEDGE_PROXY_TARGET || 'http://0.0.0.0:18080',
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/knowledgeApi/, ''),
-        },
         // ✅ 本地 API 代理（用于登录等接口）
         '^/localApi(/.*)?$': {
           target: 'http://192.168.124.6:19000',

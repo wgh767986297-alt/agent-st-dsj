@@ -7,7 +7,7 @@
       <div class="logo-orbit"></div>
       <div class="logo-orbit orbit-2"></div>
     </div>
-    <h1 class="logo-title">情指助手</h1>
+    <h1 class="logo-title">苏小智</h1>
     <p class="logo-subtitle">智能体协作平台</p>
   </div>
 </template>
@@ -36,19 +36,24 @@
   transform: translate(-50%, -50%);
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, var(--accent-light, #7EC8E3), var(--accent, #4A90E2));
+  background: linear-gradient(135deg, var(--accent-light, #7ec8e3), var(--accent, #4a90e2));
   border-radius: 50%;
   box-shadow: 0 0 30px rgba(74, 144, 226, 0.4);
   animation: corePulse 3s ease-in-out infinite;
 }
 
 @keyframes corePulse {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(74, 144, 226, 0.4), 0 0 40px rgba(74, 144, 226, 0.2);
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px rgba(74, 144, 226, 0.4),
+      0 0 40px rgba(74, 144, 226, 0.2);
     transform: translate(-50%, -50%) scale(1);
   }
   50% {
-    box-shadow: 0 0 30px rgba(74, 144, 226, 0.4), 0 0 60px rgba(74, 144, 226, 0.3);
+    box-shadow:
+      0 0 30px rgba(74, 144, 226, 0.4),
+      0 0 60px rgba(74, 144, 226, 0.3);
     transform: translate(-50%, -50%) scale(1.1);
   }
 }
@@ -59,7 +64,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   border: 2px solid transparent;
-  border-top-color: var(--accent-light, #7EC8E3);
+  border-top-color: var(--accent-light, #7ec8e3);
   border-radius: 50%;
   width: 48px;
   height: 48px;
@@ -70,31 +75,36 @@
     height: 58px;
     animation-duration: 6s;
     animation-direction: reverse;
-    border-top-color: var(--accent, #4A90E2);
+    border-top-color: var(--accent, #4a90e2);
   }
 }
 
 @keyframes ringRotate {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to { transform: translate(-50%, -50%) rotate(360deg); }
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 .logo-orbit {
   position: absolute;
   width: 8px;
   height: 8px;
-  background: var(--accent-light, #7EC8E3);
+  background: var(--accent-light, #7ec8e3);
   border-radius: 50%;
   animation: orbitMove 3s ease-in-out infinite;
 
   &.orbit-2 {
     animation-delay: -2s;
-    background: var(--accent, #4A90E2);
+    background: var(--accent, #4a90e2);
   }
 }
 
 @keyframes orbitMove {
-  0%, 100% {
+  0%,
+  100% {
     top: 0;
     left: 50%;
     transform: translateX(-50%);
@@ -124,7 +134,11 @@
   font-size: 1.75rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--text-primary, #f1f5f9) 0%, var(--accent-light, #7EC8E3) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--text-primary, #f1f5f9) 0%,
+    var(--accent-light, #7ec8e3) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

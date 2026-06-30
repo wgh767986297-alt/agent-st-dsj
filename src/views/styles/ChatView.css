@@ -7,7 +7,7 @@
 .ai-assistant-app {
   display: flex;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   color: var(--app-text);
   background: var(--app-bg-gradient);
   font-family:
@@ -227,6 +227,7 @@
   --el-card-border-radius: 16px;
 }
 .welcome-screen {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -234,6 +235,7 @@
   text-align: center;
   padding: 0 0 24px;
   animation: fadeInDown 0.5s ease;
+  background: #f0f2f5;
 }
 
 .welcome-icon {
@@ -779,10 +781,8 @@
 
 /* ==================== 输入区域 ==================== */
 .input-area {
-  width: clamp(640px, 50vw, 960px);
-  max-width: 960px;
   box-sizing: border-box;
-  margin: 0 auto;
+  margin: 0 20px;
   padding: 12px 0;
   /* background: var(--app-panel); */
   animation: inputSlideUp 0.45s cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -793,13 +793,138 @@
   display: none;
 }
 
-/* 底部区域：欢迎语 + 输入框 */
-.bottom-section--welcome {
-  flex: 1;
+/* 底部区域：欢迎语 + 选择区 + 输入框（始终置底） */
+.bottom-section {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* ==================== 警员 / MCP 选择区 ==================== */
+.resource-select-bar {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: flex-start;
+  gap: 0;
+  margin: 0 auto 8px;
+  padding: 10px 24px;
+  background: var(--ds-card, #fff);
+  border-top: 1px solid var(--ds-border, #d9dde4);
+  border-bottom: 1px solid var(--ds-border, #d9dde4);
+  box-sizing: border-box;
+}
+
+.resource-select-half {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+}
+
+.resource-select-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ds-text-secondary, #666);
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.resource-select-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0 8px;
+  background: var(--ds-border, #d9dde4);
+  flex-shrink: 0;
+}
+
+.resource-chips {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 6px;
+  min-height: 26px;
+}
+
+.resource-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--ds-bg, #f0f2f5);
+  border: 1px solid var(--ds-border, #d9dde4);
+  border-radius: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+/* 数字警员 */
+.resource-chip--officer {
+  color: var(--ds-text, #1a1a1a);
+}
+
+.resource-chip--officer:hover {
+  border-color: var(--ds-primary-light, #2a5aa0);
+  background: var(--ds-primary-softer, rgba(26, 58, 107, 0.04));
+}
+
+.resource-chip--officer.resource-chip--active {
+  background: var(--ds-primary, #1a3a6b);
+  color: #fff;
+  border-color: var(--ds-primary, #1a3a6b);
+}
+
+/* MCP 服务 */
+.resource-chip--mcp {
+  color: var(--ds-text, #1a1a1a);
+}
+
+.resource-chip--mcp:hover {
+  border-color: var(--ds-success, #2e7d32);
+  background: var(--ds-success-soft, #e8f5e9);
+}
+
+.resource-chip--mcp.resource-chip--active {
+  background: var(--ds-success, #2e7d32);
+  color: #fff;
+  border-color: var(--ds-success, #2e7d32);
+}
+
+.resource-chip--empty {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  font-style: italic;
+}
+
+/* 深色模式 */
+:root[data-theme='dark'] .resource-chip {
+  background: var(--ds-panel-muted, rgba(12, 24, 52, 0.5));
+  border-color: var(--ds-border, rgba(0, 170, 255, 0.2));
+  color: var(--ds-text-secondary, rgba(190, 210, 240, 0.65));
+}
+
+:root[data-theme='dark'] .resource-chip--officer:hover {
+  border-color: var(--ds-primary-light, #33bbff);
+  background: var(--ds-primary-soft, rgba(0, 170, 255, 0.12));
+  color: var(--ds-primary-light, #33bbff);
+}
+
+:root[data-theme='dark'] .resource-chip--officer.resource-chip--active {
+  background: var(--ds-primary, #00aaff);
+  color: #fff;
+  border-color: var(--ds-primary, #00aaff);
+}
+
+:root[data-theme='dark'] .resource-chip--mcp:hover {
+  border-color: #34d399;
+  background: rgba(5, 150, 105, 0.15);
+  color: #34d399;
+}
+
+:root[data-theme='dark'] .resource-chip--mcp.resource-chip--active {
+  background: #059669;
+  color: #fff;
+  border-color: #10b981;
 }
 
 @keyframes inputSlideUp {
@@ -819,7 +944,7 @@
   box-shadow:
     0 4px 10px rgba(0, 0, 0, 0.02),
     0 2px 4px rgba(0, 0, 0, 0.04);
-  border-radius: 28px;
+  border-radius: 10px;
   border: 1px solid var(--input-border);
   transition: all 0.2s;
   padding: 8px 12px;
@@ -2095,230 +2220,61 @@ img.emoji-image {
   content: '?';
 }
 
-/* ==================== 用户按钮（右上角） ==================== */
-.main-content__user {
-  position: absolute;
-  top: 16px;
-  right: 24px;
-  z-index: 10;
-}
-
-.main-content__user-btn {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--app-border, rgba(31, 41, 55, 0.1));
-  border-radius: 12px;
-  color: var(--app-text, #1f2937);
-  background: var(--app-panel, #ffffff);
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.main-content__user-btn:hover {
-  color: var(--grouped-sidebar-primary, #4f7cff);
-  border-color: rgba(79, 124, 255, 0.2);
-  background: rgba(79, 124, 255, 0.08);
-  box-shadow: 0 4px 12px rgba(79, 124, 255, 0.12);
-}
-
-.main-content__user-btn:active {
-  transform: scale(0.96);
-}
-
-.main-content__user-icon {
-  display: block;
-  width: 22px;
-  height: 22px;
-  background-color: var(--app-text);
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  transition: background-color 0.2s ease;
-}
-
-.main-content__user-btn:hover .main-content__user-icon {
-  background-color: var(--grouped-sidebar-primary, #4f7cff);
-}
-
-/* ==================== 用户弹窗（el-popover teleport 到 body） ==================== */
-.chat-user-popover.el-popper {
-  padding: 0;
-  border: 1px solid var(--app-border, rgba(31, 41, 55, 0.08));
-  border-radius: 16px;
-  background: var(--app-panel, #ffffff);
-  box-shadow:
-    0 18px 40px rgba(15, 23, 42, 0.12),
-    0 4px 12px rgba(15, 23, 42, 0.06);
-}
-
-.chat-user-popover__inner {
+/* ==================== 消息框外资源标签（警员 / MCP） ==================== */
+.message-resource-tags-outside {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.chat-user-popover__profile {
-  display: flex;
+/* 用户消息靠右显示，标签也靠右 */
+.message-wrapper.user-message .message-resource-tags-outside {
+  justify-content: flex-end;
+}
+
+.message-resource-tag {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 16px 14px;
-}
-
-.chat-user-popover__avatar {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  color: #ffffff;
-  background: linear-gradient(135deg, #4f7cff, #7dd3fc);
-  font-size: 18px;
-  overflow: hidden;
-}
-
-.chat-user-popover__avatar-icon {
-  display: block;
-  width: 60%;
-  height: 60%;
-  background-color: #ffffff;
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-}
-
-.chat-user-popover__info {
-  min-width: 0;
-  flex: 1;
-}
-
-.chat-user-popover__name {
-  overflow: hidden;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--app-text, #1f2937);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.chat-user-popover__dept {
-  margin-top: 3px;
-  overflow: hidden;
-  color: var(--app-text-muted, #7b8794);
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
   font-size: 12px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.chat-user-popover__divider {
-  height: 1px;
-  margin: 0 12px;
-  background: var(--app-border, rgba(31, 41, 55, 0.08));
-}
-
-.chat-user-popover__menu {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-}
-
-.chat-user-popover__menu-item {
-  width: 100%;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border: 0;
-  border-radius: 10px;
-  color: var(--app-text, #1f2937);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
   font-weight: 600;
-  text-align: left;
-  transition:
-    background 0.2s ease,
-    color 0.2s ease;
 }
 
-.chat-user-popover__menu-item .el-icon {
-  width: 18px;
-  color: var(--app-text-muted, #6b7280);
-  font-size: 16px;
+.message-resource-tag--officer {
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.08);
 }
 
-.chat-user-popover__menu-item:hover {
-  color: #4f7cff;
-  background: rgba(79, 124, 255, 0.1);
+.message-resource-tag--mcp {
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
 }
 
-.chat-user-popover__menu-item:hover .el-icon {
-  color: #4f7cff;
+.message-resource-tag__icon {
+  font-size: 13px;
+  line-height: 1;
 }
 
-.chat-user-popover__menu-item--danger {
-  color: var(--app-danger, #ef4444);
+.message-resource-tag__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chat-user-popover__menu-item--danger .el-icon {
-  color: var(--app-danger, #ef4444);
-}
-
-.chat-user-popover__menu-item--danger:hover {
-  color: var(--app-danger, #ef4444);
-  background: var(--app-danger-soft, rgba(239, 68, 68, 0.08));
-}
-
-.chat-user-popover__menu-item--danger:hover .el-icon {
-  color: var(--app-danger, #ef4444);
-}
-
-/* 深色模式 */
-:root[data-theme='dark'] .chat-user-popover.el-popper {
-  border-color: var(--app-border);
-  background: #122248;
-  box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.34),
-    0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-:root[data-theme='dark'] .main-content__user-btn {
-  color: var(--app-text);
-  border-color: var(--app-border);
-  background: var(--app-panel);
-}
-
-:root[data-theme='dark'] .main-content__user-btn:hover {
-  border-color: rgba(79, 124, 255, 0.3);
-  background: rgba(79, 124, 255, 0.12);
-}
-
-:root[data-theme='dark'] .chat-user-popover__name {
-  color: var(--app-text);
-}
-
-:root[data-theme='dark'] .chat-user-popover__menu-item {
-  color: var(--app-text);
-}
-
-:root[data-theme='dark'] .chat-user-popover__menu-item .el-icon {
-  color: var(--app-text-muted);
-}
-
-:root[data-theme='dark'] .chat-user-popover__divider {
-  background: var(--app-border);
+.message-resource-tag__skills {
+  color: inherit;
+  opacity: 0.7;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
 }

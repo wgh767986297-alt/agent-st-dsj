@@ -5,14 +5,11 @@
     <link rel="icon" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>苏小智</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-    />
+    <!--
+      内网部署：移除 Google Fonts 和 Font Awesome CDN 外部链接。
+      Google Fonts 字体已在 CSS 中作为 fallback 声明，系统会自动使用本地字体。
+      Font Awesome 仅在 mcp.html 中使用，主应用不依赖此图标库。
+    -->
     <!-- 1. CSS 兜底：系统偏好 → 即使 JS 未执行也不会白屏 -->
     <style>
       html {

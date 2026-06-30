@@ -23,10 +23,13 @@ export function resetToolCallId(): void {
 export function applyStreamChunk(
   msg: Message,
   delta: string,
-  type: 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'process_text',
+  type: 'text' | 'thinking' | 'tool_call' | 'tool_result' | 'process_text' | 'model_text',
   metadata?: any,
 ): void {
   if (!delta) return
+
+  // 过滤 model_text 类型，不在界面上展示模型信息
+  if (type === 'model_text') return
 
   // 向后兼容：追加到 content 字段
   msg.content += delta

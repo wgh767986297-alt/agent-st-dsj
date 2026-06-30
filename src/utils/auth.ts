@@ -6,10 +6,12 @@ export const USER_ACCOUNT_KEY = 'user_account'
 export const USER_PROFILE_KEY = 'user_profile'
 const USER_ROLE_KEY = 'user_role_state'
 
-const ADMIN_ROLE = '超级管理员用户'
-const ROLE_STATE_VERSION = 'v1'
+const ADMIN_ROLE = '超级管理员'
+const DEPARTMENT_ADMIN_ROLE = '部门管理员'
+const SECURITY_AUDITOR_ROLE = '安全审计员'
+const ROLE_STATE_VERSION = 'v3'
 const ROLE_STATE_SALT = 'ai-assistant-role-state'
-let runtimeRole = ''
+let runtimeRoles: string[] = []
 let authExpiredHandled = false
 export const authStateVersion = ref(0)
 
@@ -17,6 +19,7 @@ export interface StoredUserProfile {
   id?: string | number
   name?: string
   role?: string
+  role_list?: string[]
   ip?: string
   clientIp?: string
   loginIp?: string
@@ -24,6 +27,7 @@ export interface StoredUserProfile {
   phone?: string
   company?: string
   department?: string
+  dept_id?: number
 }
 
 const ID_CARD_REGEX = /^\d{17}[\dXx]$/
@@ -146,6 +150,20 @@ function getRolesFromRecord(record: Record<string, unknown> | null | undefined):
     return []
   }
 
+  // 优先处理 role_list 结构: [{ role_name: "xxx" }, ...]
+  const roleList = record.role_list
+  if (Array.isArray(roleList)) {
+    const names = roleList
+      .map((item: unknown) => {
+        if (typeof item === 'object' && item !== null) {
+          return (item as Record<string, unknown>).role_name || (item as Record<string, unknown>).name || ''
+        }
+        return ''
+      })
+      .filter(Boolean) as string[]
+    if (names.length > 0) return names
+  }
+
   return [
     ...normalizeRoleValue(record.role),
     ...normalizeRoleValue(record.userRole),
@@ -178,64 +196,85 @@ function getRoleStorageSalt(): string {
   return `${ROLE_STATE_SALT}:${getAuthToken() || 'anonymous'}`
 }
 
-function obfuscateRole(role: string): string {
+function obfuscateRoles(roles: string[]): string {
+  const text = JSON.stringify(roles)
   const salt = getRoleStorageSalt()
-  const encoded = Array.from(role)
+  const encoded = Array.from(text)
     .map((char, index) => char.charCodeAt(0) ^ salt.charCodeAt(index % salt.length))
     .join('.')
 
   return `${ROLE_STATE_VERSION}:${encodeBase64(encoded)}`
 }
 
-function deobfuscateRole(value: string): string {
+function deobfuscateRoles(value: string): string[] {
   const [version, payload] = value.split(':')
   if (version !== ROLE_STATE_VERSION || !payload) {
-    return ''
+    return []
   }
 
   const decoded = decodeBase64(payload)
   if (!decoded) {
-    return ''
+    return []
   }
 
   const salt = getRoleStorageSalt()
   try {
-    return decoded
+    const text = decoded
       .split('.')
       .map((code, index) =>
         String.fromCharCode(Number(code) ^ salt.charCodeAt(index % salt.length)),
       )
       .join('')
+    const parsed = JSON.parse(text)
+    return Array.isArray(parsed) ? parsed : []
   } catch {
-    return ''
+    return []
   }
 }
 
-function getStoredRole(): string {
+function getStoredRoles(): string[] {
   const raw = localStorage.getItem(USER_ROLE_KEY)
   if (!raw) {
-    return ''
+    return []
   }
 
-  const role = deobfuscateRole(raw).trim()
-  if (!role) {
+  const roles = deobfuscateRoles(raw)
+  if (roles.length === 0) {
     localStorage.removeItem(USER_ROLE_KEY)
   }
 
-  return role
+  return roles
 }
 
-function setStoredRole(role: string): void {
-  if (!role) {
+function setStoredRoles(roles: string[]): void {
+  if (roles.length === 0) {
     localStorage.removeItem(USER_ROLE_KEY)
     return
   }
 
-  localStorage.setItem(USER_ROLE_KEY, obfuscateRole(role))
+  localStorage.setItem(USER_ROLE_KEY, obfuscateRoles(roles))
 }
 
-function resolvePrimaryRole(roles: string[]): string {
-  return roles.find((role) => role === ADMIN_ROLE) || roles[0] || ''
+/** 获取当前用户所有角色（合并内存、localStorage、JWT 三个来源） */
+function getAllUserRoles(): string[] {
+  const stored = getStoredRoles()
+  if (runtimeRoles.length === 0 && stored.length > 0) {
+    runtimeRoles = stored
+  }
+  const all = [...runtimeRoles, ...stored, ...getRolesFromToken()]
+  return [...new Set(all.filter(Boolean))]
+}
+
+/** 检查当前用户是否为安全审计员 */
+export function isSecurityAuditor(): boolean {
+  authStateVersion.value
+  return getAllUserRoles().includes(SECURITY_AUDITOR_ROLE)
+}
+
+/** 检查当前用户是否为部门管理员 */
+export function isDepartmentAdmin(): boolean {
+  authStateVersion.value
+  return getAllUserRoles().includes(DEPARTMENT_ADMIN_ROLE)
 }
 
 export function getRolesFromToken(): string[] {
@@ -251,38 +290,32 @@ export function getRolesFromToken(): string[] {
 export function isAdminAccount(): boolean {
   // UI visibility only. Backend admin APIs must validate token permissions.
   authStateVersion.value
-  const storedRole = getStoredRole()
-  if (!runtimeRole && storedRole) {
-    runtimeRole = storedRole
-  }
-
-  const roles = [runtimeRole, storedRole, ...getRolesFromToken()].filter(Boolean)
-  return roles.includes(ADMIN_ROLE)
+  return getAllUserRoles().some((role) => role === ADMIN_ROLE || role === '超级管理员用户')
 }
 
 export function saveAuth(token: string, profile?: StoredUserProfile): void {
-  const previousStoredRole = getStoredRole()
+  const previousRoles = getStoredRoles()
   localStorage.setItem(AUTH_TOKEN_KEY, token)
 
   if (!profile) {
     const tokenRoles = getRolesFromToken()
-    runtimeRole = resolvePrimaryRole([...tokenRoles, previousStoredRole])
-    if (runtimeRole) {
-      setStoredRole(runtimeRole)
-    }
+    runtimeRoles = [...new Set([...tokenRoles, ...previousRoles])]
+    setStoredRoles(runtimeRoles)
     authStateVersion.value += 1
     return
   }
 
   const current = getStoredUserProfile()
-  const profileRoles = normalizeRoleValue(profile.role)
+  // 优先使用 role_list 数组
+  const profileRoles = profile.role_list && profile.role_list.length > 0
+    ? profile.role_list
+    : normalizeRoleValue(profile.role)
   const profileWithoutRole = { ...profile }
   delete profileWithoutRole.role
   const tokenRoles = getRolesFromToken()
-  const roles = [...profileRoles, ...tokenRoles]
-  runtimeRole = resolvePrimaryRole(roles)
-  setStoredRole(runtimeRole)
-  const nextProfile = { ...current, ...profileWithoutRole }
+  runtimeRoles = [...new Set([...profileRoles, ...tokenRoles])]
+  setStoredRoles(runtimeRoles)
+  const nextProfile = { ...current, ...profileWithoutRole, role_list: runtimeRoles }
   localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile))
   authStateVersion.value += 1
 }
@@ -306,8 +339,71 @@ export function getCurrentAccount(): string {
   return String(profile?.idCard || profile?.name || '').trim()
 }
 
+/** 获取当前登录用户的 ID */
+export function getCurrentUserId(): number | null {
+  const profile = getStoredUserProfile()
+  if (profile?.id) {
+    const num = Number(profile.id)
+    return Number.isNaN(num) ? null : num
+  }
+  // 回退：从 JWT 中解析
+  const token = getAuthToken()
+  if (token) {
+    const payload = decodeJwtRecord(token)
+    if (payload) {
+      const id = payload.userId || payload.user_id || payload.id || payload.sub
+      if (id) {
+        const num = Number(id)
+        return Number.isNaN(num) ? null : num
+      }
+    }
+  }
+  return null
+}
+
+/** 获取当前登录用户的部门 ID */
+export function getCurrentDeptId(): number | null {
+  // 优先从存储的 profile 中读取
+  const profile = getStoredUserProfile()
+  if (profile?.dept_id) {
+    const num = Number(profile.dept_id)
+    if (!Number.isNaN(num)) return num
+  }
+  // 回退1：profile.department 可能存的是数字 ID
+  if (profile?.department) {
+    const num = Number(profile.department)
+    if (!Number.isNaN(num) && num > 0) return num
+  }
+  // 回退2：从 JWT 中解析（含嵌套结构）
+  const token = getAuthToken()
+  if (token) {
+    const payload = decodeJwtRecord(token)
+    if (payload) {
+      const pickDeptId = (s: Record<string, unknown>) =>
+        s.dept_id || s.deptId || s.departmentId || s.department_id || s.department
+      // 顶层字段
+      let jitDeptId = pickDeptId(payload)
+      if (!jitDeptId) {
+        // 嵌套对象：data.dept_id, user.dept_id 等
+        for (const key of ['data', 'user', 'profile', 'result']) {
+          const nested = payload[key] as Record<string, unknown> | undefined
+          if (nested) {
+            jitDeptId = pickDeptId(nested)
+            if (jitDeptId) break
+          }
+        }
+      }
+      if (jitDeptId) {
+        const num = Number(jitDeptId)
+        if (!Number.isNaN(num) && num > 0) return num
+      }
+    }
+  }
+  return null
+}
+
 export function clearAuth(): void {
-  runtimeRole = ''
+  runtimeRoles = []
   const cookies = ['JSESSIONID', 'sessionId', 'token', AUTH_TOKEN_KEY]
   cookies.forEach((cookieName) => {
     document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`

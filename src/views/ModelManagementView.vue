@@ -84,8 +84,8 @@
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <div class="model-actions">
-              <el-button text type="primary" @click="openEditDialog(row)">编辑</el-button>
-              <el-button text type="danger" @click="handleDelete(row)">删除</el-button>
+              <el-button class="model-action-btn" size="small" text @click="openEditDialog(row)">编辑</el-button>
+              <el-button class="model-action-btn model-action-btn--danger" size="small" text @click="handleDelete(row)">删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -97,7 +97,7 @@
       :title="dialogMode === 'create' ? '新增模型' : '编辑模型'"
       width="620px"
       destroy-on-close
-      class="model-dialog"
+      class="ds-modal model-dialog"
     >
       <el-form class="model-form" label-position="top" :model="form" @submit.prevent>
         <el-form-item label="模型名称" required>
@@ -309,14 +309,13 @@ onMounted(() => {
 
 <style scoped>
 .model-page {
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 32px 40px 24px;
   color: var(--app-text);
   background: var(--app-bg-gradient);
-  overflow: hidden;
+  overflow: hidden auto;
 }
 
 .model-page--embedded {
@@ -392,13 +391,15 @@ onMounted(() => {
   min-height: 0;
   flex: 1 1 auto;
   margin: 0 0 24px;
-  overflow: hidden;
+  overflow: hidden auto;
   border: 1px solid var(--app-border);
   border-radius: 16px;
   background: var(--app-panel);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.03),
     0 8px 24px rgba(24, 39, 75, 0.06);
+  display: flex;
+  flex-direction: column;
 }
 
 .model-table-toolbar {
@@ -422,6 +423,8 @@ onMounted(() => {
 
 .model-table {
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .model-table :deep(.el-table__header th) {
@@ -439,8 +442,34 @@ onMounted(() => {
 }
 
 .model-actions {
-  display: flex;
-  gap: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-action-btn {
+  min-width: auto !important;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  color: var(--app-primary);
+  transition: all 0.2s ease;
+}
+
+.model-action-btn:hover {
+  background: var(--app-primary-soft);
+  color: var(--app-primary-strong);
+}
+
+.model-action-btn--danger {
+  color: var(--app-text-muted);
+}
+
+.model-action-btn--danger:hover {
+  background: var(--app-danger-soft);
+  color: var(--app-danger);
 }
 
 .table-skeleton {
@@ -459,19 +488,13 @@ onMounted(() => {
 
 .table-skeleton__row span {
   height: 13px;
-  overflow: hidden;
   border-radius: 999px;
-  background: var(--app-skeleton-line-bg);
-  position: relative;
+  background: var(--app-border);
+  animation: model-skeleton-pulse 1.5s ease-in-out infinite;
 }
-
-.table-skeleton__row span::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, var(--app-skeleton-shimmer), transparent);
-  animation: table-loading-shimmer 1.15s infinite;
+@keyframes model-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .model-form {
@@ -505,12 +528,6 @@ onMounted(() => {
 
 .model-dialog :deep(.el-dialog__footer) {
   padding: 0 24px 24px;
-}
-
-@keyframes table-loading-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
 }
 
 /* 深色模式 */

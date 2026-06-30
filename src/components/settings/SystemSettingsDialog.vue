@@ -87,10 +87,9 @@ const handleChangePassword = async () => {
   <el-dialog
     v-model="visible"
     width="480px"
-    align-center
     destroy-on-close
     :show-close="false"
-    class="system-settings-dialog"
+    class="ds-modal system-settings-dialog"
   >
     <div class="settings-root">
       <!-- 头部 -->

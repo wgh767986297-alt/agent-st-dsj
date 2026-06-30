@@ -1,209 +1,233 @@
 <template>
   <div
-    class="log-query-page"
-    :class="{
-      'log-query-page--detail-open': conversationDetailVisible,
-      'log-query-page--embedded': props.embedded,
-    }"
+    class="ds-page-wrapper ds-page"
+    :class="{ 'ds-page--embedded': props.embedded }"
   >
-    <header class="log-query-header">
-      <div class="log-query-title-group">
-        <button v-if="!props.embedded" class="log-query-back-link" type="button" @click="goBack" aria-label="返回">
-          <el-icon :size="18"><ArrowLeft /></el-icon>
-        </button>
-        <div class="log-query-title-row">
-          <span class="log-query-title-icon">
-            <el-icon><Tickets /></el-icon>
-          </span>
+    <!-- 页面标题行 -->
+    <div class="ds-page-title-row">
+      <h1 class="ds-page-title">安全审计日志</h1>
+      <!-- 安全审计智能体按钮暂时屏蔽 -->
+      <!-- <button class="ds-agent-toggle" @click="toggleAgentPanel">
+        <svg viewBox="0 0 24 24" fill="currentColor" style="width:16px;height:16px;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"></path></svg>
+        安全审计智能体
+      </button> -->
+    </div>
+
+    <!-- 左右布局 -->
+    <div class="ds-layout-split">
+      <!-- 左侧：审计表格 -->
+      <div class="ds-layout-left">
+        <!-- 数据源切换标签 -->
+        <div class="ds-section-tabs">
+          <button
+            v-for="option in logTypeOptions"
+            :key="option.value"
+            class="ds-section-tab"
+            :class="{ active: activeLogType === option.value }"
+            @click="handleLogTypeChange(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+
+        <!-- 筛选行 -->
+        <div class="ds-filter-row">
+          <!-- 操作日志专用筛选 -->
+          <template v-if="activeLogType === 'operation'">
+            <input
+              v-model="operationSearchAccount"
+              class="ds-search-input"
+              placeholder="用户账号"
+              @keyup.enter="handleQuerySubmit"
+            />
+            <el-select v-model="operationSearchType" style="width: 160px" clearable placeholder="全部操作类型" @change="handleQuerySubmit">
+              <el-option label="创建" value="CREATE" />
+              <el-option label="更新" value="UPDATE" />
+              <el-option label="删除" value="DELETE" />
+              <el-option label="分配" value="ASSIGN" />
+              <el-option label="授权" value="AUTH" />
+              <el-option label="审核" value="AUDIT" />
+              <el-option label="申请" value="APPLY" />
+            </el-select>
+            <el-select v-model="operationSearchModule" style="width: 160px" clearable placeholder="全部操作模块" @change="handleQuerySubmit">
+              <el-option label="部门管理" value="DEPARTMENT" />
+              <el-option label="技能管理" value="SKILL" />
+              <el-option label="数字警员" value="OFFICER" />
+              <el-option label="MCP服务" value="MCP" />
+              <el-option label="授权管理" value="AUTH" />
+              <el-option label="用户管理" value="USER" />
+              <el-option label="角色管理" value="ROLE" />
+            </el-select>
+          </template>
+          <!-- 登录/对话日志筛选 -->
+          <template v-else>
+            <input
+              v-model="searchKeyword"
+              class="ds-search-input"
+              :placeholder="searchPlaceholder"
+              @keyup.enter="handleQuerySubmit"
+            />
+            <el-select v-model="auditRoleFilter" style="width: 160px" clearable placeholder="全部角色">
+              <el-option label="超级管理员" value="超级管理员" />
+              <el-option label="部门管理员" value="部门管理员" />
+              <el-option label="普通用户" value="普通用户" />
+              <el-option label="安全审计员" value="安全审计员" />
+            </el-select>
+          </template>
+
+          <el-date-picker
+            v-model="dateRange"
+            style="width:260px;flex-shrink:0;"
+            type="daterange"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            range-separator="至"
+            value-format="YYYYMMDD"
+          />
+
+          <button class="ds-btn-primary" :disabled="loading" @click="handleQuerySubmit">
+            <el-icon><Search /></el-icon>
+            查询
+          </button>
+          <button class="ds-btn-outline" @click="handleQueryReset">
+            <el-icon><Refresh /></el-icon>
+            重置
+          </button>
+          <button
+            v-if="activeLogType === 'operation'"
+            class="ds-btn-success"
+            :disabled="operationExporting"
+            @click="handleExportOperation"
+          >
+            <el-icon><Download /></el-icon>
+            导出
+          </button>
+        </div>
+
+        <!-- 统一审计表格 -->
+        <div class="ds-table-wrap">
+          <table class="ds-table">
+            <thead>
+              <tr>
+                <th style="width:170px;">时间</th>
+                <th style="width:110px;">用户</th>
+                <th style="width:100px;">角色</th>
+                <th style="width:100px;">操作类型</th>
+                <th>操作内容</th>
+                <th style="width:140px;">IP地址</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loading" class="ds-loading-row">
+                <td colspan="6" class="ds-empty-cell" style="padding:60px 20px;">
+                  <span style="color:var(--ds-text-secondary);">日志查询中...</span>
+                </td>
+              </tr>
+              <tr v-else-if="pagedUnifiedRows.length === 0">
+                <td colspan="6" class="ds-empty-cell">暂无匹配日志</td>
+              </tr>
+              <tr
+                v-for="row in pagedUnifiedRows"
+                :key="row.id"
+                @click="row.sourceType === 'conversation' ? openConversationDetailFromAudit(row) : undefined"
+                :style="row.sourceType === 'conversation' ? 'cursor:pointer;' : ''"
+              >
+                <td>{{ row.time }}</td>
+                <td>{{ row.user }}</td>
+                <td>{{ row.role }}</td>
+                <td>{{ row.operationType }}</td>
+                <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.operationContent }}</td>
+                <td style="font-family:var(--ds-font-mono);font-size:12px;">{{ row.ip }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 分页 -->
+        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="filteredUnifiedRows.length"
+            layout="total, prev, pager, next"
+            background
+            small
+          />
+        </div>
+      </div>
+
+      <!-- 右侧：安全审计智能体面板 -->
+      <div class="ds-layout-right" :class="{ collapsed: !agentPanelVisible }">
+        <div class="ds-agent-header">
+          <div class="ds-agent-avatar">审</div>
           <div>
-            <h1>日志查询</h1>
+            <div class="ds-agent-title">安全审计智能体</div>
+            <div class="ds-agent-sub">7x24 审计日志分析助手</div>
+          </div>
+          <button class="ds-agent-close" @click="toggleAgentPanel">&times;</button>
+        </div>
+        <div class="ds-agent-messages">
+          <div
+            v-for="(msg, idx) in agentMessages"
+            :key="idx"
+            class="ds-agent-msg"
+            :class="msg.role"
+          >
+            <div class="ds-agent-msg-avatar">{{ msg.role === 'ai' ? '审' : '我' }}</div>
+            <div class="ds-agent-msg-bubble">
+              {{ msg.text }}
+              <div v-if="msg.suggestions && msg.suggestions.length" class="ds-sq-chips">
+                <span
+                  v-for="(s, si) in msg.suggestions"
+                  :key="si"
+                  class="ds-sq-chip"
+                  @click="askAgent(s)"
+                >{{ s }}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </header>
-
-    <div class="log-panel">
-      <div class="log-query-toolbar">
-      <div class="log-type-toggle" role="group" aria-label="日志类型">
-        <button
-          v-for="option in logTypeOptions"
-          :key="option.value"
-          class="log-type-toggle__button"
-          :class="{ 'log-type-toggle__button--active': activeLogType === option.value }"
-          type="button"
-          @click="handleLogTypeChange(option.value)"
-        >
-          <el-icon><component :is="option.icon" /></el-icon>
-          <span>{{ option.label }}</span>
-        </button>
-      </div>
-
-      <div class="log-query-controls">
-        <el-input
-          v-model="searchKeyword"
-          class="log-search-input"
-          clearable
-          :prefix-icon="Search"
-          :placeholder="searchPlaceholder"
-          @keyup.enter="handleQuerySubmit"
-        />
-
-        <el-date-picker
-          v-model="dateRange"
-          class="log-date-range"
-          style="width: 16vw; max-width: 100%"
-          type="daterange"
-          start-placeholder="开始日期"
-          end-placeholder="结束日期"
-          range-separator="至"
-          value-format="YYYYMMDD"
-        />
-
-        <div class="log-query-actions">
-          <el-button type="primary" :icon="Search" :loading="loading" @click="handleQuerySubmit">
-            查询
-          </el-button>
-          <el-button :icon="Refresh" @click="handleQueryReset">重置</el-button>
+        <div class="ds-agent-input">
+          <input
+            v-model="agentInput"
+            type="text"
+            placeholder="输入问题，按 Enter 发送..."
+            @keydown.enter="sendAgentMessage"
+          />
+          <button @click="sendAgentMessage">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#fff;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+          </button>
         </div>
       </div>
     </div>
 
-    <section class="log-table-shell">
-      <div v-if="loading" class="table-skeleton" aria-busy="true" aria-label="日志查询中">
-        <div v-for="index in 8" :key="`log-loading-row-${index}`" class="table-skeleton__row">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
-
-      <el-empty
-        v-else-if="pagedRows.length === 0"
-        class="log-table-empty"
-        description="暂无匹配日志"
-      />
-
-      <el-table
-        v-else-if="activeLogType === 'login'"
-        :data="pagedRows"
-        class="log-table"
-        row-key="id"
-        table-layout="fixed"
-      >
-        <el-table-column label="序号" type="index" width="76" align="center" />
-        <el-table-column prop="account" label="账号" min-width="190" show-overflow-tooltip />
-        <el-table-column prop="username" label="用户名" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="loginip" label="登录 IP" min-width="180" show-overflow-tooltip />
-        <el-table-column
-          prop="logindateText"
-          label="登录时间"
-          min-width="210"
-          show-overflow-tooltip
-        />
-        <el-table-column label="状态" min-width="120">
-          <template #default="{ row }">
-            <el-tag :type="row.status === '01' ? 'success' : 'danger'" size="small">
-              {{ formatStatus(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <el-table
-        v-else
-        :data="pagedRows"
-        class="log-table conversation-log-table"
-        row-key="id"
-        table-layout="auto"
-      >
-        <el-table-column label="序号" type="index" width="76" align="center" />
-        <el-table-column
-          prop="account"
-          label="账号/身份证号"
-          min-width="190"
-          show-overflow-tooltip
-        />
-        <el-table-column prop="title" label="对话标题" min-width="260" show-overflow-tooltip />
-        <el-table-column
-          prop="updateTimeText"
-          label="更新时间"
-          min-width="190"
-          show-overflow-tooltip
-        />
-        <el-table-column label="内容预览" min-width="420">
-          <template #default="{ row }">
-            <div class="conversation-summary">
-              <div class="conversation-summary__main">
-                <span class="conversation-summary__count">{{ row.messages.length }} 条消息</span>
-                <span class="conversation-summary__text">{{ row.contentPreview }}</span>
-              </div>
-              <el-button
-                class="conversation-preview-button"
-                :class="{
-                  'conversation-preview-button--active': isConversationDetailActive(row),
-                }"
-                size="small"
-                circle
-                :icon="ArrowRight"
-                aria-label="查看详情"
-                :aria-pressed="isConversationDetailActive(row)"
-                @click="openConversationDetail(row)"
-              />
-            </div>
-          </template>
-        </el-table-column>
-      </el-table>
-    </section>
-
-    <div class="log-pagination">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50]"
-        :total="filteredRows.length"
-        layout="total, prev, pager, next"
-        background
-      />
-    </div>
-    </div>
-
+    <!-- 对话详情抽屉 -->
     <el-drawer
       v-model="conversationDetailVisible"
-      class="conversation-detail-drawer"
       direction="rtl"
       size="min(600px, 42vw)"
       :modal="false"
-      modal-class="conversation-detail-overlay"
       :with-header="false"
       :lock-scroll="false"
       @closed="handleConversationDetailClosed"
     >
-      <section class="conversation-detail">
+      <section class="conversation-detail" v-if="selectedConversation">
         <header class="conversation-detail__header">
           <div>
-            <h2>{{ selectedConversation?.title || '对话详情' }}</h2>
+            <h2>{{ selectedConversation.title || '对话详情' }}</h2>
             <p>
-              {{ selectedConversation?.account || '-' }}
-              <span v-if="selectedConversation?.updateTimeText">
-                · {{ selectedConversation.updateTimeText }}
+              {{ selectedConversation.account || '-' }}
+              <span v-if="selectedConversation.updateTimeText">
+                &middot; {{ selectedConversation.updateTimeText }}
               </span>
-              <span v-if="selectedConversation?.ip"> · IP {{ selectedConversation.ip }} </span>
+              <span v-if="selectedConversation.ip"> &middot; IP {{ selectedConversation.ip }} </span>
             </p>
           </div>
-          <el-button
-            class="conversation-detail__close"
-            text
-            circle
-            :icon="Close"
-            aria-label="关闭"
-            @click="closeConversationDetail"
-          />
+          <button class="conversation-detail__close-btn" @click="closeConversationDetail" aria-label="关闭">&times;</button>
         </header>
-
         <div class="conversation-detail__body">
-          <div v-if="!selectedConversation?.messages.length" class="conversation-preview__empty">
+          <div v-if="!selectedConversation.messages.length" class="conversation-detail__empty">
             暂无可展示的对话内容
           </div>
           <template v-else>
@@ -290,13 +314,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  ArrowLeft,
-  ArrowRight,
   ChatLineRound,
-  Close,
+  Download,
+  Files,
   Refresh,
   Search,
-  Tickets,
   UserFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -310,12 +332,28 @@ import {
   type ConversationLogItem,
   type LoginLogItem,
 } from '@/api/logQuery'
+import { operationLogApi, type OperationLogItem } from '@/api/operationLog'
 
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false,
 })
 
-type LogType = 'login' | 'conversation'
+type LogType = 'login' | 'conversation' | 'operation'
+
+// ==================== 统一审计行接口 ====================
+interface AuditLogRow {
+  id: string
+  time: string
+  timeRaw: string
+  user: string
+  account: string
+  role: string
+  operationType: string
+  operationContent: string
+  ip: string
+  sourceType: LogType
+  sourceData: any
+}
 
 interface NormalizedLoginLog extends LoginLogItem {
   logindateText: string
@@ -371,6 +409,74 @@ const pageSize = ref(10)
 const conversationDetailVisible = ref(false)
 const selectedConversation = ref<NormalizedConversationLog | null>(null)
 
+// ========== Operation log state ==========
+const operationRows = ref<OperationLogItem[]>([])
+const operationSearchAccount = ref('')
+const operationSearchType = ref('')
+const operationSearchModule = ref('')
+const operationExporting = ref(false)
+
+// ========== 新增状态 ==========
+const agentPanelVisible = ref(false)
+const agentInput = ref('')
+const auditRoleFilter = ref('')
+
+interface AgentMessage {
+  role: 'ai' | 'user'
+  text: string
+  suggestions?: string[]
+}
+
+const agentMessages = ref<AgentMessage[]>([
+  {
+    role: 'ai',
+    text: '您好！我是安全审计智能体，可以帮您分析审计日志、排查异常操作、生成审计报告。请问有什么需要帮助的？',
+    suggestions: [
+      '今日是否有异常操作',
+      '最近7天授权变更汇总',
+      '哪些用户查询最频繁',
+    ],
+  },
+])
+
+function toggleAgentPanel() {
+  agentPanelVisible.value = !agentPanelVisible.value
+}
+
+function askAgent(question: string) {
+  agentMessages.value.push({ role: 'user', text: question })
+  // 模拟回复
+  setTimeout(() => {
+    const replies: Record<string, string> = {
+      '今日是否有异常操作': '经分析今日审计日志，发现1条高风险操作：用户 zhangsan 在凌晨02:13查询了重点人员前科记录，属于非工作时间敏感查询。另有2条中风险操作记录，其余均为正常操作。建议关注该用户后续操作行为。',
+      '最近7天授权变更汇总': '最近7天共有5次授权变更：\n1. admin 为刑侦支队授权skill"人员信息核查"\n2. admin 为刑侦支队授权MCP服务"卡口数据服务"\n3. admin 取消了网安支队的skill"重点区域监控"\n4. lisi 为治安大队授权MCP服务"GIS地图服务"\n5. admin 审核通过"情报汇总分析员"上架申请',
+      '哪些用户查询最频繁': '近7天查询频次统计：\n1. zhangsan - 38次（普通用户·刑侦支队）\n2. lisi - 22次（部门管理员·刑侦支队）\n3. wangwu - 15次（部门管理员·治安大队）\n4. admin - 12次（超级管理员）\n\n其中 zhangsan 有1次凌晨异常查询，建议关注。',
+    }
+    const reply = replies[question] || '已收到您的问题，正在分析相关审计数据，请稍候...'
+    agentMessages.value.push({ role: 'ai', text: reply })
+  }, 600)
+}
+
+function sendAgentMessage() {
+  const text = agentInput.value.trim()
+  if (!text) return
+  agentInput.value = ''
+  askAgent(text)
+}
+
+/** 获取近3天日期范围 (YYYYMMDD格式) */
+function getDefaultThreeDayRange(): [string, string] {
+  const now = new Date()
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}${m}${day}`
+  }
+  return [fmt(threeDaysAgo), fmt(now)]
+}
+
 const conversationMarkdown = new MarkdownIt({
   html: false,
   linkify: true,
@@ -403,35 +509,167 @@ const dateRange = ref<[string, string] | null>(null)
 const logTypeOptions = [
   { value: 'login' as const, label: '登录日志', icon: UserFilled },
   { value: 'conversation' as const, label: '对话日志', icon: ChatLineRound },
+  { value: 'operation' as const, label: '操作日志', icon: Files },
 ]
 
-const searchPlaceholder = computed(() =>
-  activeLogType.value === 'login' ? '输入账号、姓名或登录 IP' : '输入账号、身份证号或对话标题',
-)
+const searchPlaceholder = computed(() => {
+  if (activeLogType.value === 'login') return '输入账号、姓名或登录 IP'
+  if (activeLogType.value === 'operation') return '输入用户账号'
+  return '输入账号、身份证号或对话标题'
+})
 
-const currentRows = computed(() =>
-  activeLogType.value === 'login' ? loginRows.value : conversationRows.value,
-)
+const currentRows = computed(() => {
+  if (activeLogType.value === 'login') return loginRows.value
+  if (activeLogType.value === 'operation') return operationRows.value
+  return conversationRows.value
+})
 
+// ==================== 角色推导 ====================
+function deriveRole(account: string, sourceType: LogType, sourceData: any): string {
+  if (sourceType === 'operation' && (sourceData as OperationLogItem)?.user_role) {
+    return (sourceData as OperationLogItem).user_role
+  }
+  const acc = (account || '').toLowerCase()
+  if (acc === 'admin') return '超级管理员'
+  if (acc === 'auditor') return '安全审计员'
+  if (acc === 'lisi' || acc === 'wangwu' || acc === 'zhaoliu') return '部门管理员'
+  return '普通用户'
+}
+
+
+function normalizeLoginToAudit(row: NormalizedLoginLog): AuditLogRow {
+  return {
+    id: row.id || `login-${row.logindate}`,
+    time: row.logindateText,
+    timeRaw: row.logindate || '',
+    user: row.username || row.account || '-',
+    account: row.account || '-',
+    role: deriveRole(row.account || '', 'login', row),
+    operationType: row.status === '01' ? '登录成功' : '登录失败',
+    operationContent: `${row.username || row.account} 于 ${row.logindateText} 从 ${row.loginip || '未知IP'} 登录${row.status === '01' ? '成功' : '失败'}`,
+    ip: row.loginip || '-',
+    sourceType: 'login',
+    sourceData: row,
+  }
+}
+
+function normalizeConversationToAudit(row: NormalizedConversationLog): AuditLogRow {
+  const preview = row.contentPreview || '-'
+  return {
+    id: row.id || `conv-${row.sessionId}`,
+    time: row.updateTimeText || row.createTimeText,
+    timeRaw: row.updateTimeRaw || row.createTimeRaw,
+    user: row.account || '-',
+    account: row.account || '-',
+    role: deriveRole(row.account || '', 'conversation', row),
+    operationType: '对话',
+    operationContent: `对话"${row.title}": ${preview}`,
+    ip: row.ip || '-',
+    sourceType: 'conversation',
+    sourceData: row,
+  }
+}
+
+function normalizeOperationToAudit(row: OperationLogItem): AuditLogRow {
+  const typeMap: Record<string, string> = {
+    CREATE: '创建', UPDATE: '更新', DELETE: '删除',
+    ASSIGN: '分配', AUTH: '授权', AUDIT: '审核', APPLY: '申请',
+  }
+  const moduleMap: Record<string, string> = {
+    DEPARTMENT: '部门管理', SKILL: '技能管理', OFFICER: '数字警员',
+    MCP: 'MCP服务', AUTH: '授权管理', USER: '用户管理', ROLE: '角色管理',
+  }
+  const opType = typeMap[row.operation_type] || row.operation_type
+  const opModule = moduleMap[row.operation_module] || row.operation_module
+  let content = ''
+  try {
+    content = typeof row.operation_content === 'string'
+      ? row.operation_content
+      : JSON.stringify(row.operation_content)
+  } catch {
+    content = String(row.operation_content || '')
+  }
+  if (content.length > 100) content = content.slice(0, 100) + '...'
+
+  return {
+    id: `op-${row.id}`,
+    time: formatBackendTime(row.create_time),
+    timeRaw: row.create_time || '',
+    user: row.user_name || row.user_account || '-',
+    account: row.user_account || '-',
+    role: row.user_role || deriveRole(row.user_account || '', 'operation', row),
+    operationType: `${opType}·${opModule}`,
+    operationContent: content,
+    ip: row.request_ip || '-',
+    sourceType: 'operation',
+    sourceData: row,
+  }
+}
+
+// ==================== 统一审计行计算属性 ====================
+const unifiedRows = computed<AuditLogRow[]>(() => {
+  if (activeLogType.value === 'login') {
+    return loginRows.value.map(normalizeLoginToAudit)
+  }
+  if (activeLogType.value === 'conversation') {
+    return conversationRows.value.map(normalizeConversationToAudit)
+  }
+  // operation
+  return operationRows.value.map(normalizeOperationToAudit)
+})
+
+const filteredUnifiedRows = computed(() => {
+  let rows = unifiedRows.value
+
+  // 按角色筛选
+  if (auditRoleFilter.value && activeLogType.value !== 'operation') {
+    rows = rows.filter((r) => r.role === auditRoleFilter.value)
+  }
+
+  // 登录/对话日志的客户端关键词过滤
+  if (activeLogType.value === 'login') {
+    const keyword = searchKeyword.value.trim().toLowerCase()
+    if (keyword) {
+      rows = rows.filter((r) =>
+        [r.account, r.user, r.ip].some((v) =>
+          String(v || '').toLowerCase().includes(keyword),
+        ),
+      )
+    }
+  } else if (activeLogType.value === 'conversation') {
+    const keyword = searchKeyword.value.trim().toLowerCase()
+    if (keyword) {
+      rows = rows.filter((r) =>
+        [r.account, r.operationContent].some((v) =>
+          String(v || '').toLowerCase().includes(keyword),
+        ),
+      )
+    }
+  }
+  // operation 行的筛选已在服务端完成（通过 loadOperationLogs 参数）
+
+  return rows
+})
+
+const pagedUnifiedRows = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredUnifiedRows.value.slice(start, start + pageSize.value)
+})
+
+// 保留 filteredRows 和 pagedRows 用于向后兼容（原代码中引用的地方）
 const filteredRows = computed(() => {
   if (activeLogType.value === 'login') {
     return filterLoginRows(loginRows.value)
   }
-
+  if (activeLogType.value === 'operation') {
+    return operationRows.value
+  }
   const keyword = searchKeyword.value.trim().toLowerCase()
   return conversationRows.value.filter((row) => {
-    if (!isConversationTimeInRange(row)) {
-      return false
-    }
-
-    if (!keyword) {
-      return true
-    }
-
+    if (!isConversationTimeInRange(row)) return false
+    if (!keyword) return true
     return [row.account, row.title, row.contentPreview].some((value) =>
-      String(value || '')
-        .toLowerCase()
-        .includes(keyword),
+      String(value || '').toLowerCase().includes(keyword),
     )
   })
 })
@@ -447,19 +685,13 @@ const goBack = () => {
 
 const formatBackendTime = (value?: string) => {
   if (!value) return ''
-
   const text = String(value)
   if (/^\d{14}$/.test(text)) {
-    return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)} ${text.slice(
-      8,
-      10,
-    )}:${text.slice(10, 12)}:${text.slice(12, 14)}`
+    return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)} ${text.slice(8, 10)}:${text.slice(10, 12)}:${text.slice(12, 14)}`
   }
-
   if (/^\d{8}$/.test(text)) {
     return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`
   }
-
   return text
 }
 
@@ -472,15 +704,9 @@ const formatStatus = (status?: string) => {
 }
 
 const isTimeInRange = (value?: string) => {
-  if (!dateRange.value || dateRange.value.length !== 2) {
-    return true
-  }
-
+  if (!dateRange.value || dateRange.value.length !== 2) return true
   const time = String(value || '')
-  if (!/^\d{14}$/.test(time)) {
-    return false
-  }
-
+  if (!/^\d{14}$/.test(time)) return false
   const [startTime, endTime] = dateRange.value
   const startDateTime = startTime ? `${startTime}000000` : ''
   const endDateTime = endTime ? `${endTime}235959` : ''
@@ -489,29 +715,20 @@ const isTimeInRange = (value?: string) => {
 
 const filterLoginRows = (rows: NormalizedLoginLog[]) => {
   const keyword = searchKeyword.value.trim().toLowerCase()
-
   return rows.filter((row) => {
     const matchedKeyword =
       !keyword ||
       [row.account, row.username, row.loginip].some((value) =>
-        String(value || '')
-          .toLowerCase()
-          .includes(keyword),
+        String(value || '').toLowerCase().includes(keyword),
       )
     return matchedKeyword && isTimeInRange(row.logindate)
   })
 }
 
 const isConversationTimeInRange = (row: NormalizedConversationLog) => {
-  if (!dateRange.value || dateRange.value.length !== 2) {
-    return true
-  }
-
+  if (!dateRange.value || dateRange.value.length !== 2) return true
   const time = row.updateTimeRaw || row.createTimeRaw
-  if (!/^\d{14}$/.test(time)) {
-    return false
-  }
-
+  if (!/^\d{14}$/.test(time)) return false
   const [startDate, endDate] = dateRange.value
   const startDateTime = startDate ? `${startDate}000000` : ''
   const endDateTime = endDate ? `${endDate}235959` : ''
@@ -534,16 +751,10 @@ const normalizeMessageRole = (role?: string) => {
 }
 
 const normalizeContentBlock = (block: unknown): ConversationContentBlock | null => {
-  if (!block || typeof block !== 'object') {
-    return null
-  }
-
+  if (!block || typeof block !== 'object') return null
   const record = block as Record<string, unknown>
   const type = record.type
-  if (type !== 'text' && type !== 'thinking' && type !== 'tool_call' && type !== 'tool_result') {
-    return null
-  }
-
+  if (type !== 'text' && type !== 'thinking' && type !== 'tool_call' && type !== 'tool_result') return null
   return {
     type,
     content: String(record.content || '').trim(),
@@ -565,11 +776,9 @@ const normalizeThinkingBlocks = (
         })
         .filter((block): block is ConversationThinkingBlock => !!block)
     : []
-
   const fromContentBlocks = contentBlocks
     .filter((block) => block.type === 'thinking' && block.content)
     .map((block) => ({ content: block.content }))
-
   return [...fromThinkingBlocks, ...fromContentBlocks]
 }
 
@@ -586,14 +795,11 @@ const normalizeToolCallGroups = (
         if (!toolCall) return null
         const toolResult = normalizeContentBlock(record.toolResult)
         const normalizedGroup: ConversationToolCallGroup = { toolCall }
-        if (toolResult) {
-          normalizedGroup.toolResult = toolResult
-        }
+        if (toolResult) normalizedGroup.toolResult = toolResult
         return normalizedGroup
       })
       .filter((group): group is ConversationToolCallGroup => !!group)
   }
-
   const groups: ConversationToolCallGroup[] = []
   for (const block of contentBlocks) {
     if (block.type === 'tool_call') {
@@ -606,10 +812,7 @@ const normalizeToolCallGroups = (
 }
 
 const parseConversationMessages = (content?: string): ConversationMessage[] => {
-  if (!content) {
-    return []
-  }
-
+  if (!content) return []
   try {
     const parsed = JSON.parse(content) as Array<{ role?: string; content?: string }>
     if (Array.isArray(parsed)) {
@@ -626,7 +829,6 @@ const parseConversationMessages = (content?: string): ConversationMessage[] => {
             .map((block) => block.content)
             .join('\n\n')
             .trim()
-
           return {
             role: normalizeMessageRole(String(record.role || '')),
             content: textFromBlocks || String(record.content || '').trim(),
@@ -651,7 +853,6 @@ const parseConversationMessages = (content?: string): ConversationMessage[] => {
       },
     ]
   }
-
   return []
 }
 
@@ -666,35 +867,11 @@ const renderConversationMarkdown = (content: string) => {
   const rendered = conversationMarkdown.render(
     normalizeStreamingUrls(normalizeStreamingMarkdown(content || '')),
   )
-
   return DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: [
-      'p',
-      'br',
-      'strong',
-      'em',
-      'u',
-      's',
-      'code',
-      'pre',
-      'blockquote',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'ul',
-      'ol',
-      'li',
-      'table',
-      'thead',
-      'tbody',
-      'tr',
-      'th',
-      'td',
-      'a',
-      'span',
+      'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'span',
     ],
     ALLOWED_ATTR: ['href', 'title', 'class', 'target', 'rel'],
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
@@ -708,7 +885,6 @@ const getMessageTextContent = (message: ConversationMessage) => {
     .map((block) => block.content)
     .join('\n\n')
     .trim()
-
   return textFromBlocks || message.content.trim()
 }
 
@@ -759,7 +935,6 @@ const buildLoginQueryParams = () => {
   const isIp = /^\d{1,3}(?:\.\d{1,3}){1,3}$/.test(keyword)
   const startDate = dateRange.value?.[0]
   const endDate = dateRange.value?.[1]
-
   return {
     account: isIp ? undefined : keyword,
     loginip: isIp ? keyword : undefined,
@@ -773,7 +948,6 @@ const buildConversationQueryParams = () => {
   const isAccountLike = /^[\dA-Za-z_-]{6,}$/.test(keyword)
   const startDate = dateRange.value?.[0]
   const endDate = dateRange.value?.[1]
-
   return {
     account: isAccountLike ? keyword : undefined,
     title: keyword && !isAccountLike ? keyword : undefined,
@@ -805,35 +979,62 @@ const loadLogs = async () => {
 }
 
 const handleLogTypeChange = (type: LogType) => {
-  if (activeLogType.value === type) {
-    return
-  }
-
+  if (activeLogType.value === type) return
   closeConversationDetail()
   activeLogType.value = type
   searchKeyword.value = ''
-  dateRange.value = null
   currentPage.value = 1
-  loadLogs()
+  auditRoleFilter.value = ''
+
+  if (type === 'operation') {
+    operationSearchAccount.value = ''
+    operationSearchType.value = ''
+    operationSearchModule.value = ''
+    dateRange.value = getDefaultOperationDateRange()
+    operationRows.value = []
+    loadOperationLogs()
+  } else {
+    dateRange.value = null
+    loadLogs()
+  }
 }
 
 const handleQuerySubmit = () => {
   closeConversationDetail()
   currentPage.value = 1
-  loadLogs()
+  if (activeLogType.value === 'operation') {
+    loadOperationLogs()
+  } else {
+    loadLogs()
+  }
 }
 
 const handleQueryReset = () => {
   closeConversationDetail()
   searchKeyword.value = ''
-  dateRange.value = null
   currentPage.value = 1
-  loadLogs()
+  auditRoleFilter.value = ''
+  if (activeLogType.value === 'operation') {
+    operationSearchAccount.value = ''
+    operationSearchType.value = ''
+    operationSearchModule.value = ''
+    dateRange.value = getDefaultOperationDateRange()
+    loadOperationLogs()
+  } else {
+    dateRange.value = null
+    loadLogs()
+  }
 }
 
 const openConversationDetail = (row: NormalizedConversationLog) => {
   selectedConversation.value = row
   conversationDetailVisible.value = true
+}
+
+const openConversationDetailFromAudit = (auditRow: AuditLogRow) => {
+  if (auditRow.sourceType === 'conversation' && auditRow.sourceData) {
+    openConversationDetail(auditRow.sourceData as NormalizedConversationLog)
+  }
 }
 
 const closeConversationDetail = () => {
@@ -848,359 +1049,211 @@ const isConversationDetailActive = (row: NormalizedConversationLog) => {
   return conversationDetailVisible.value && selectedConversation.value?.id === row.id
 }
 
+// ========== Operation log helpers ==========
+function getOpTypeColor(type: string) {
+  const map: Record<string, string> = {
+    CREATE: 'primary', UPDATE: 'warning', DELETE: 'danger',
+    ASSIGN: 'success', AUTH: 'primary', AUDIT: 'info', APPLY: '',
+  }
+  return map[type] || 'info'
+}
+
+function getDefaultOperationDateRange(): [string, string] {
+  const now = new Date()
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}${m}${day}`
+  }
+  return [fmt(threeDaysAgo), fmt(now)]
+}
+
+async function loadOperationLogs() {
+  loading.value = true
+  try {
+    const params: any = { limit: 100 }
+    if (operationSearchAccount.value) params.user_account = operationSearchAccount.value
+    if (operationSearchType.value) params.operation_type = operationSearchType.value
+    if (operationSearchModule.value) params.operation_module = operationSearchModule.value
+    if (dateRange.value?.[0]) params.start_time = dateRange.value[0] + '000000'
+    if (dateRange.value?.[1]) params.end_time = dateRange.value[1] + '235959'
+    operationRows.value = await operationLogApi.query(params)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '操作日志查询失败')
+    operationRows.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleExportOperation() {
+  operationExporting.value = true
+  try {
+    const params: any = { limit: 10000 }
+    if (operationSearchAccount.value) params.user_account = operationSearchAccount.value
+    if (operationSearchType.value) params.operation_type = operationSearchType.value
+    if (operationSearchModule.value) params.operation_module = operationSearchModule.value
+    if (dateRange.value?.[0]) params.start_time = dateRange.value[0] + '000000'
+    if (dateRange.value?.[1]) params.end_time = dateRange.value[1] + '235959'
+    await operationLogApi.exportLog(params)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e.message || '导出失败')
+  } finally {
+    operationExporting.value = false
+  }
+}
+
 onMounted(() => {
   loadLogs()
 })
 </script>
 
 <style scoped>
-.log-query-page {
-  --detail-panel-width: min(600px, 42vw);
-  height: 100vh;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  padding: 32px 40px 24px;
-  color: var(--app-text);
-  background: var(--app-bg-gradient);
-  overflow: hidden;
-}
+/* ==================== 页面级微调（大部分样式由 design-tokens.css 提供） ==================== */
 
-.log-query-page--embedded {
-  padding: 28px 32px 0;
+.ds-page-wrapper {
   height: 100%;
-  background: transparent;
+  overflow-y: auto;
 }
 
-.log-query-page--detail-open .log-query-header,
-.log-query-page--detail-open .log-query-toolbar,
-.log-query-page--detail-open .log-table-shell,
-.log-query-page--detail-open .log-pagination {
-  width: calc(100% - var(--detail-panel-width));
-  max-width: none;
-  margin-left: 0;
-  margin-right: 0;
+/* 修复 Element Plus date-picker 在 ds-filter-row 中的对齐 */
+.ds-filter-row :deep(.el-date-editor) {
+  flex-shrink: 0;
 }
 
-.log-query-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 40px;
-  flex: 0 0 auto;
+.ds-filter-row :deep(.el-input__wrapper) {
+  border-radius: var(--ds-radius-input);
+  box-shadow: none;
+  border: 1px solid var(--ds-border);
+  background: var(--ds-card);
+  transition: border-color 0.2s;
 }
 
-.log-query-title-group {
-  min-width: 0;
+.ds-filter-row :deep(.el-input__wrapper:hover) {
+  border-color: var(--ds-border-hover);
 }
 
-.log-query-back-link {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  flex: 0 0 40px;
-  place-items: center;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  color: var(--app-text-muted);
-  background: var(--app-panel);
-  cursor: pointer;
-  transition: all 0.2s ease;
+.ds-filter-row :deep(.el-input__wrapper.is-focus) {
+  border-color: var(--ds-primary-light);
+  box-shadow: 0 0 0 3px var(--ds-primary-softer);
 }
 
-.log-query-back-link:hover {
-  color: var(--app-primary);
-  border-color: var(--app-primary);
-  background: var(--app-primary-soft);
-  transform: translateX(-2px);
+.ds-filter-row :deep(.el-range-input) {
+  font-size: 13px;
+  color: var(--ds-text);
 }
 
-.log-query-title-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
+.ds-filter-row :deep(.el-range-input::placeholder) {
+  color: var(--ds-text-subtle);
 }
 
-.log-query-title-icon {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  flex: 0 0 52px;
-  place-items: center;
-  border-radius: 16px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--app-primary), var(--app-primary-strong));
-  font-size: 24px;
-  box-shadow: 0 8px 24px rgba(79, 124, 255, 0.22);
+.ds-filter-row :deep(.el-range-separator) {
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  padding: 0 4px;
 }
 
-.log-query-header h1 {
-  margin: 0;
-  color: var(--app-text);
-  font-size: 28px;
-  font-weight: 780;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+.ds-filter-row :deep(.el-range__icon),
+.ds-filter-row :deep(.el-range__close-icon) {
+  color: var(--ds-text-secondary);
 }
 
+/* 分页微调 */
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {
+  background-color: var(--ds-primary);
+}
 
-/* ==================== 主面板 ==================== */
-.log-panel {
-  padding: 24px;
-  border: 1px solid var(--app-border);
-  border-radius: 16px;
-  background: var(--app-panel);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.03),
-    0 8px 24px rgba(24, 39, 75, 0.06);
-  flex: 1;
-  min-height: 0;
+:deep(.el-pagination.is-background .el-pager li:not(.is-disabled):hover) {
+  color: var(--ds-primary);
+}
+
+/* ==================== 对话详情抽屉 ==================== */
+.conversation-detail {
+  height: 100%;
   display: flex;
   flex-direction: column;
+  color: var(--ds-text);
+  background: var(--ds-panel);
 }
 
-.log-query-toolbar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.log-type-toggle {
-  display: inline-flex;
-  padding: 4px;
-  border: 1px solid var(--app-border);
-  border-radius: 12px;
-  background: var(--app-panel-muted);
-}
-
-.log-type-toggle__button {
-  min-width: 108px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 0;
-  border-radius: 9px;
-  color: var(--app-text-muted);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.log-type-toggle__button--active {
-  color: var(--app-primary);
-  background: var(--app-panel);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-}
-
-.log-query-controls {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 320px 280px auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.log-search-input {
-  width: 320px;
-  flex: 0 0 auto;
-}
-
-.log-date-range {
-  width: 100%;
-  min-width: 0;
-}
-
-.log-date-range :deep(.el-range-input) {
-  min-width: 0;
-}
-
-.log-date-range :deep(.el-range__close-icon) {
-  flex: 0 0 auto;
-}
-
-.log-query-actions {
+.conversation-detail__header {
+  flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.log-query-actions :deep(.el-button) {
-  border-radius: 8px;
-  font-weight: 650;
-}
-.log-table-shell {
-  min-height: 0;
-  flex: 0 1 auto;
-  margin-top: 24px;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  border: 1px solid var(--app-border);
-  border-radius: 16px;
-  background: var(--app-panel);
-  box-shadow: var(--app-shadow);
-}
-
-.log-table {
-  min-width: 0;
-  width: 100%;
-}
-
-.log-query-page--detail-open .log-table {
-  min-width: 0;
-}
-
-.log-table :deep(.el-table__inner-wrapper),
-.log-table :deep(.el-table__body-wrapper),
-.log-table :deep(.el-scrollbar__wrap) {
-  overflow-x: hidden !important;
-}
-
-.log-table :deep(.el-scrollbar__bar.is-horizontal) {
-  display: none !important;
-}
-
-.log-table :deep(.el-table__header th) {
-  color: var(--app-text);
-  background: var(--app-panel-muted);
-  font-weight: 760;
-}
-
-.log-table :deep(.el-table__body td) {
-  color: var(--app-text);
-}
-
-.log-table :deep(.cell) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.log-table :deep(.el-table__body tr:hover > td.el-table__cell) {
-  background: var(--app-primary-softer);
-}
-
-.conversation-summary {
-  min-width: 0;
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--ds-border);
+  background: var(--ds-card);
 }
 
-.conversation-summary__main {
+.conversation-detail__header > div {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
-.conversation-summary__count {
-  flex: 0 0 auto;
-  padding: 3px 8px;
-  border-radius: 999px;
-  color: var(--app-primary);
-  background: var(--app-primary-soft);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.conversation-summary__text {
-  min-width: 0;
-  flex: 1 1 auto;
+.conversation-detail__header h2 {
+  margin: 0;
   overflow: hidden;
-  color: var(--app-text-muted);
-  white-space: nowrap;
+  color: var(--ds-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.conversation-summary :deep(.conversation-preview-button.el-button) {
-  --el-button-bg-color: var(--app-primary);
-  --el-button-border-color: var(--app-primary);
-  --el-button-hover-bg-color: var(--app-primary-strong);
-  --el-button-hover-border-color: var(--app-primary-strong);
-  --el-button-active-bg-color: var(--app-primary-strong);
-  --el-button-active-border-color: var(--app-primary-strong);
-  --el-button-text-color: #ffffff;
-  --el-button-hover-text-color: #ffffff;
-  flex: 0 0 auto;
+.conversation-detail__header p {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-detail__close-btn {
+  flex-shrink: 0;
   width: 28px;
   height: 28px;
-  padding: 0;
-  overflow: visible;
-  color: #ffffff !important;
-  border-color: var(--app-primary) !important;
-  background: var(--app-primary) !important;
-  box-shadow: none !important;
-  font-weight: 650;
-  transition: none;
+  background: none;
+  border: 1px solid var(--ds-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.conversation-summary :deep(.conversation-preview-button.el-button .el-icon) {
-  transform-origin: center;
-  transition: transform 0.18s ease;
+.conversation-detail__close-btn:hover {
+  background: var(--ds-bg);
+  color: var(--ds-text);
 }
 
-.conversation-summary :deep(.conversation-preview-button.el-button:hover),
-.conversation-summary :deep(.conversation-preview-button.el-button:focus) {
-  color: #ffffff !important;
-  border-color: var(--app-primary-strong) !important;
-  background: var(--app-primary-strong) !important;
-  box-shadow: none !important;
+.conversation-detail__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--ds-bg);
 }
 
-.conversation-summary :deep(.conversation-preview-button--active.el-button) {
-  --el-button-bg-color: var(--app-success);
-  --el-button-border-color: var(--app-success);
-  --el-button-hover-bg-color: var(--app-success);
-  --el-button-hover-border-color: var(--app-success);
-  --el-button-active-bg-color: var(--app-success);
-  --el-button-active-border-color: var(--app-success);
-  --el-button-text-color: #ffffff;
-  --el-button-hover-text-color: #ffffff;
-  color: #ffffff !important;
-  border-color: var(--app-success) !important;
-  background: var(--app-success) !important;
-  box-shadow: none !important;
-}
-
-.conversation-summary :deep(.conversation-preview-button--active.el-button:hover),
-.conversation-summary :deep(.conversation-preview-button--active.el-button:focus) {
-  color: #ffffff !important;
-  border-color: var(--app-success) !important;
-  background: var(--app-success) !important;
-  box-shadow: none !important;
-}
-
-.conversation-summary :deep(.conversation-preview-button--active.el-button .el-icon) {
-  transform: rotate(180deg);
-}
-
-.conversation-preview {
-  max-height: 520px;
-  display: grid;
-  gap: 16px;
-  padding: 20px 28px 24px;
-  overflow: auto;
-  background: var(--app-panel-muted);
-}
-
-.conversation-preview__empty {
-  padding: 18px;
-  border: 1px dashed var(--app-border);
-  border-radius: 12px;
-  color: var(--app-text-muted);
-  background: var(--app-panel);
+.conversation-detail__empty {
   text-align: center;
+  padding: 40px 20px;
+  color: var(--ds-text-secondary);
+  font-size: 14px;
 }
 
+/* 对话气泡 */
 .conversation-bubble-row {
   display: flex;
 }
@@ -1211,16 +1264,15 @@ onMounted(() => {
   min-width: 0;
   padding: 11px 14px;
   overflow: hidden;
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--ds-border);
   border-radius: 14px;
-  color: var(--app-text);
-  background: var(--app-panel);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  color: var(--ds-text);
+  background: var(--ds-card);
 }
 
 .conversation-bubble-row--user .conversation-bubble {
-  border-color: color-mix(in srgb, var(--app-primary) 28%, var(--app-border));
-  background: color-mix(in srgb, var(--app-primary) 9%, var(--app-panel));
+  border-color: color-mix(in srgb, var(--ds-primary) 28%, var(--ds-border));
+  background: color-mix(in srgb, var(--ds-primary) 9%, var(--ds-card));
 }
 
 .conversation-bubble__content {
@@ -1233,149 +1285,29 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.conversation-bubble__content--empty {
+  color: var(--ds-text-subtle);
+}
+
 .conversation-insight-list + .conversation-bubble__content {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--app-border);
+  border-top: 1px solid var(--ds-border);
 }
 
-.conversation-bubble__content.markdown-body {
-  white-space: normal;
-}
-
-.conversation-bubble__content :deep(p) {
-  margin: 0 0 10px;
-}
-
-.conversation-bubble__content :deep(p:last-child) {
-  margin-bottom: 0;
-}
-
-.conversation-bubble__content :deep(pre) {
-  max-width: 100%;
-  overflow-x: hidden;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--app-panel-muted);
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.conversation-bubble__content :deep(code) {
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-.conversation-bubble__content :deep(table) {
-  width: 100%;
-  max-width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  overflow: hidden;
-}
-
-.conversation-bubble__content :deep(th),
-.conversation-bubble__content :deep(td) {
-  padding: 6px 8px;
-  border: 1px solid var(--app-border);
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-:global(.conversation-detail-drawer) {
-  height: 100vh;
-  height: 100dvh;
-  max-width: 100vw;
-  pointer-events: auto;
-}
-
-:global(.conversation-detail-overlay) {
-  pointer-events: none;
-}
-
-:global(.conversation-detail-drawer .el-drawer__body) {
-  height: 100%;
-  padding: 0;
-  background: var(--app-panel);
-  overflow: hidden;
-}
-
-.conversation-detail {
-  height: 100%;
-  min-height: 0;
+/* 思考/工具 details */
+.conversation-insight-list {
   display: flex;
   flex-direction: column;
-  color: var(--app-text);
-}
-
-.conversation-detail__header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--app-border);
-  background: var(--app-panel);
-}
-
-.conversation-detail__header > div {
-  min-width: 0;
-}
-
-.conversation-detail__header h2 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--app-text);
-  font-size: 18px;
-  font-weight: 780;
-  letter-spacing: 0;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conversation-detail__header p {
-  margin: 6px 0 0;
-  overflow: hidden;
-  color: var(--app-text-muted);
-  font-size: 13px;
-  line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conversation-detail__close {
-  flex: 0 0 auto;
-  color: var(--app-text-muted);
-}
-
-.conversation-detail__body {
-  min-height: 0;
-  min-width: 0;
-  flex: 1 1 auto;
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  padding: 18px 20px 24px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  background: var(--app-panel-muted);
-}
-
-.conversation-insight-list {
-  display: grid;
   gap: 8px;
-  margin-top: 12px;
 }
 
 .conversation-insight {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--ds-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--app-panel) 82%, transparent);
+  background: color-mix(in srgb, var(--ds-card) 82%, transparent);
 }
 
 .conversation-insight summary {
@@ -1387,9 +1319,9 @@ onMounted(() => {
   padding: 9px 11px;
   cursor: pointer;
   list-style: none;
-  color: var(--app-text);
+  color: var(--ds-text);
   font-size: 13px;
-  font-weight: 720;
+  font-weight: 700;
 }
 
 .conversation-insight summary::-webkit-details-marker {
@@ -1400,7 +1332,7 @@ onMounted(() => {
   content: '';
   width: 7px;
   height: 7px;
-  flex: 0 0 auto;
+  flex-shrink: 0;
   border-right: 2px solid currentColor;
   border-bottom: 2px solid currentColor;
   transform: rotate(-45deg);
@@ -1414,40 +1346,40 @@ onMounted(() => {
 
 .conversation-insight summary span {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .conversation-insight summary em {
-  flex: 0 0 auto;
+  flex-shrink: 0;
   padding: 2px 7px;
   border-radius: 999px;
-  color: var(--app-text-muted);
-  background: var(--app-panel-muted);
+  color: var(--ds-text-secondary);
+  background: var(--ds-panel-muted);
   font-size: 12px;
   font-style: normal;
   font-weight: 650;
 }
 
 .conversation-insight--thinking summary {
-  color: var(--app-primary);
-  background: var(--app-primary-softer);
+  color: var(--ds-primary);
+  background: var(--ds-primary-softer);
 }
 
 .conversation-insight--tool summary {
-  color: var(--app-success);
-  background: var(--tc-green-bg);
+  color: var(--ds-success);
+  background: var(--ds-success-soft);
 }
 
 .conversation-insight__body {
   min-width: 0;
   max-width: 100%;
   padding: 11px;
-  border-top: 1px solid var(--app-border);
-  color: var(--app-text);
-  background: var(--app-panel);
+  border-top: 1px solid var(--ds-border);
+  color: var(--ds-text);
+  background: var(--ds-card);
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -1456,11 +1388,11 @@ onMounted(() => {
 .conversation-tool-args pre {
   max-width: 100%;
   margin: 8px 0 0;
-  overflow-x: hidden;
+  overflow-x: auto;
   padding: 10px;
   border-radius: 8px;
-  color: var(--app-text);
-  background: var(--app-panel-muted);
+  color: var(--ds-text);
+  background: var(--ds-panel-muted);
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -1469,104 +1401,57 @@ onMounted(() => {
 .conversation-tool-args,
 .conversation-tool-result {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .conversation-tool-result {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px dashed var(--app-border);
+  border-top: 1px dashed var(--ds-border);
 }
 
 .conversation-tool-args strong,
 .conversation-tool-result strong {
-  color: var(--app-text-muted);
+  color: var(--ds-text-secondary);
   font-size: 12px;
   font-weight: 760;
 }
 
-.log-table-empty {
-  min-height: 320px;
-  display: grid;
-  place-items: center;
+/* ==================== 全局 drawer 样式覆盖 ==================== */
+:deep(.el-drawer) {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 100vw;
+  pointer-events: auto;
 }
 
-.table-skeleton {
-  display: grid;
-}
-
-.table-skeleton__row {
-  height: 52px;
-  display: grid;
-  grid-template-columns: 70px 1fr 1.2fr 0.9fr 0.7fr;
-  align-items: center;
-  gap: 18px;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--app-border);
-}
-
-.table-skeleton__row span {
-  height: 13px;
+:deep(.el-drawer__body) {
+  height: 100%;
+  padding: 0;
+  background: var(--ds-card);
   overflow: hidden;
-  border-radius: 999px;
-  background: var(--app-skeleton-line-bg);
-  position: relative;
 }
 
-.table-skeleton__row span::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, var(--app-skeleton-shimmer), transparent);
-  animation: table-loading-shimmer 1.15s infinite;
-}
-
-.log-pagination {
-  display: flex;
-  justify-content: flex-end;
-  margin: 12px 0 22px;
-  flex: 0 0 auto;
-}
-
-@keyframes table-loading-shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
+/* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
-  .log-query-toolbar {
-    grid-template-columns: 1fr;
+  .ds-filter-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .log-query-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .log-query-actions {
-    justify-content: flex-end;
-  }
-
-  .log-query-page {
-    padding: 20px 16px;
-  }
-
-  .log-query-page--embedded {
-    padding: 12px 14px 0;
-  }
-}
-
-@media (max-width: 640px) {
-  .log-query-header,
-  .log-type-toggle {
+  .ds-filter-row .ds-search-input,
+  .ds-filter-row .ds-select {
     width: 100%;
   }
 
-  .log-type-toggle__button {
-    flex: 1;
-    min-width: 0;
+  .ds-filter-row :deep(.el-date-editor) {
+    width: 100% !important;
+  }
+
+  .ds-table-wrap {
+    overflow-x: auto;
   }
 }
 </style>

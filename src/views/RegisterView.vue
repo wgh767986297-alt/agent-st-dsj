@@ -35,11 +35,22 @@
           />
         </el-form-item>
         <el-form-item label="部门" :required="!isChangePassword">
-          <el-input
-            v-model.trim="form.department"
-            v-bind="noAutofillAttrs('register_org_unit')"
-            placeholder="请输入部门，如：情报指挥中心"
-          />
+          <el-select
+            v-model="selectedDeptId"
+            class="dept-select"
+            placeholder="请选择部门"
+            filterable
+            :loading="deptLoading"
+            :disabled="isChangePassword"
+            @change="onDeptChange"
+          >
+            <el-option
+              v-for="d in deptList"
+              :key="d.id"
+              :label="d.dept_name"
+              :value="d.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item :label="isChangePassword ? '新密码' : '密码'" required>
           <el-input
@@ -92,11 +103,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Hide, View } from '@element-plus/icons-vue'
 import { authApi } from '@/api/auth'
+import { departmentApi, type Department } from '@/api/department'
 import { validateIdCard, validatePasswordLength } from '@/utils/auth'
 
 const router = useRouter()
@@ -112,8 +124,36 @@ const form = reactive({
   phone: '',
   company: '',
   department: '',
+  dept_id: undefined as number | undefined,
   password: '',
 })
+
+// 部门列表（从 API 加载）
+const deptList = ref<Department[]>([])
+const deptLoading = ref(false)
+const selectedDeptId = ref<number | undefined>(undefined)
+
+function onDeptChange(deptId: number | undefined) {
+  if (deptId) {
+    const dept = deptList.value.find((d) => d.id === deptId)
+    form.dept_id = deptId
+    form.department = dept?.dept_name || ''
+  } else {
+    form.dept_id = undefined
+    form.department = ''
+  }
+}
+
+async function loadDeptList() {
+  deptLoading.value = true
+  try {
+    deptList.value = await departmentApi.list()
+  } catch {
+    deptList.value = []
+  } finally {
+    deptLoading.value = false
+  }
+}
 
 const isChangePassword = computed(() => route.name === 'ChangePassword')
 const inputName = (name: string) => `${isChangePassword.value ? 'change' : 'register'}_${name}`
@@ -128,6 +168,12 @@ const noAutofillAttrs = (name: string) => ({
 
 const passwordInputStyle = (visible: boolean) =>
   visible ? {} : { '-webkit-text-security': 'disc' }
+
+onMounted(() => {
+  if (!isChangePassword.value) {
+    loadDeptList()
+  }
+})
 
 const validate = () => {
   const requiredValues = isChangePassword.value
@@ -341,6 +387,27 @@ const handleSubmit = async () => {
 
 :deep(.el-input__inner::placeholder) {
   color: #bfc7d2;
+}
+
+/* ===== 部门下拉选择器统一样式 ===== */
+:deep(.dept-select .el-input__wrapper) {
+  background-color: #ffffff !important;
+  border: 1.5px solid var(--rp-inp-border);
+  border-radius: 10px;
+  box-shadow: none !important;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  padding: 0.8rem 1rem;
+}
+
+:deep(.dept-select .el-input__wrapper:hover) {
+  border-color: var(--rp-accent);
+  box-shadow: none !important;
+}
+
+:deep(.dept-select .el-select__wrapper.is-focus .el-input__wrapper),
+:deep(.dept-select .el-input__wrapper.is-focus) {
+  border-color: var(--rp-accent);
+  box-shadow: 0 0 0 3px var(--rp-accent-l) !important;
 }
 
 /* ===== 密码切换图标 ===== */

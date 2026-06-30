@@ -20,6 +20,8 @@ function parseStreamLine(
   try {
     const parsed = JSON.parse(data)
     const type = parsed.type ?? parsed.event ?? 'text'
+    // 过滤 model_text 类型，不在界面上展示模型信息
+    if (type === 'model_text') return null
     const delta = parsed.text ?? parsed.content ?? parsed.delta ?? parsed.answer ?? ''
 
     let toolName = parsed.tool_name || parsed.toolName
@@ -151,6 +153,7 @@ export const chatServices = {
     onError: (error: Error) => void,
     onBehaviorSensitive?: (message: string, result: BehaviorCheckResult) => void,
     signal?: AbortSignal,
+    extraBody?: Record<string, unknown>,
   ) => {
     const controller = new AbortController()
 
@@ -193,7 +196,10 @@ export const chatServices = {
         onBehaviorSensitive?.(behaviorResult.message || '消息包含敏感词', behaviorResult)
       }
 
-      const body = chatServices._buildRequestBody(content, user, fileIds, modelName)
+      const body = {
+        ...chatServices._buildRequestBody(content, user, fileIds, modelName),
+        ...(extraBody || {}),
+      }
       return await streamRequest(
         `${baseURL}/chat`,
         body,

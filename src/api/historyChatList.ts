@@ -2,6 +2,8 @@ import axios from 'axios'
 import {
   AUTH_TOKEN_KEY,
   getCurrentAccount,
+  getCurrentUserId,
+  getCurrentDeptId,
   handleAuthExpired,
   isAuthExpiredResponse,
   saveAuth,
@@ -22,6 +24,18 @@ historyApi.interceptors.request.use(
     if (token) {
       config.headers.token = `${token}`
     }
+    // 自动注入当前用户 ID 和部门 ID
+    if (config.data && typeof config.data === 'object') {
+      const userId = getCurrentUserId()
+      const deptId = getCurrentDeptId()
+      const data = config.data as Record<string, unknown>
+      if (userId != null && !('user_id' in data)) {
+        data.user_id = userId
+      }
+      if (deptId != null && !('dept_id' in data)) {
+        data.dept_id = deptId
+      }
+    }
     return config
   },
   (error) => Promise.reject(error),
@@ -37,8 +51,6 @@ historyApi.interceptors.response.use(
     return response.data
   },
   (error) => {
-
-
     if (isAuthExpiredResponse(error.response?.data, error.response?.status)) {
       handleAuthExpired()
       return Promise.reject(new Error(error.response?.data?.message || 'token已过期'))
@@ -90,7 +102,7 @@ export const insertMsg = async (
   qaCount: number,
 ) => {
   const response = await historyApi.post(
-    '/qbpt/ntjk/insertMsg.xhtml',
+    '/dsjpt/jk/insertMsg.xhtml',
     await withClientIp({
       account,
       sessionId,
@@ -104,7 +116,7 @@ export const insertMsg = async (
 
 export const deleteLogicMsg = async (account: string, sessionId: string) => {
   return historyApi.post(
-    '/qbpt/ntjk/deleteLogicMsg.xhtml',
+    '/dsjpt/jk/deleteLogicMsg.xhtml',
     await withClientIp({
       account,
       sessionId,
@@ -117,10 +129,7 @@ export const selectByIdMsg = async (account: string, sessionId?: string, limit?:
   if (limit !== undefined) {
     params.limit = limit
   }
-  return historyApi.post(
-    '/qbpt/ntjk/selectByIdMsg.xhtml',
-    await withClientIp(params),
-  )
+  return historyApi.post('/dsjpt/jk/selectByIdMsg.xhtml', await withClientIp(params))
 }
 
 export const updateMsg = async (
@@ -131,7 +140,7 @@ export const updateMsg = async (
   qaCount: number,
 ) => {
   const response = await historyApi.post(
-    '/qbpt/ntjk/updateMsg.xhtml',
+    '/dsjpt/jk/updateMsg.xhtml',
     await withClientIp({
       account,
       sessionId,

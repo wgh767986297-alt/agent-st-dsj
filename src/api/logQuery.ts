@@ -1,9 +1,5 @@
 import axios from 'axios'
-import {
-  getAuthToken,
-  handleAuthExpired,
-  isAuthExpiredResponse,
-} from '@/utils/auth'
+import { getAuthToken, getCurrentUserId, getCurrentDeptId, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
 
 export interface LoginLogItem {
   id?: string
@@ -58,6 +54,18 @@ logQueryApi.interceptors.request.use(
     if (token) {
       config.headers.token = token
     }
+    // 自动注入当前用户 ID 和部门 ID
+    if (config.data && typeof config.data === 'object') {
+      const userId = getCurrentUserId()
+      const deptId = getCurrentDeptId()
+      const data = config.data as Record<string, unknown>
+      if (userId != null && !('user_id' in data)) {
+        data.user_id = userId
+      }
+      if (deptId != null && !('dept_id' in data)) {
+        data.dept_id = deptId
+      }
+    }
     return config
   },
   (error) => Promise.reject(error),
@@ -73,7 +81,6 @@ logQueryApi.interceptors.response.use(
     return response.data
   },
   (error) => {
-
     if (isAuthExpiredResponse(error.response?.data, error.response?.status)) {
       handleAuthExpired()
     }
@@ -119,7 +126,7 @@ const compactPayload = (payload: Record<string, string | undefined>) => {
 export const getLoginLogs = async (params: LoginLogQueryParams = {}) => {
   const token = getAuthToken() || undefined
   const response = await logQueryApi.post<unknown, unknown>(
-    '/qbpt/ntjk/getLoginLog.xhtml',
+    '/dsjpt/jk/getLoginLog.xhtml',
     compactPayload({
       token,
       account: params.account?.trim(),
@@ -134,7 +141,7 @@ export const getLoginLogs = async (params: LoginLogQueryParams = {}) => {
 
 export const getConversationLogs = async (params: ConversationLogQueryParams = {}) => {
   const response = await logQueryApi.post<unknown, unknown>(
-    '/qbpt/ntjk/selectByIdMsg.xhtml',
+    '/dsjpt/jk/selectByIdMsg.xhtml',
     compactPayload({
       account: params.account?.trim(),
       title: params.title?.trim(),

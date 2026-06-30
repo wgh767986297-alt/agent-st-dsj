@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useChatStore } from '@/stores/chat'
 import { ElButton, ElIcon, ElScrollbar, ElTooltip } from 'element-plus'
@@ -16,20 +16,12 @@ import ActionDialog from '@/components/common/ActionDialog.vue'
 import iconNavOpen from '@/assets/icons/nav/icon-nav-open.png'
 import iconNavHistory from '@/assets/icons/nav/icon-nav-history.png'
 import iconNewChat from '@/assets/icons/nav/icon-nav-chat.png'
-import iconNavSkills from '@/assets/icons/nav/icon-nav-skills.png'
-import iconNavPlan from '@/assets/icons/nav/icon-nav-plan.png'
-import iconNavMcp from '@/assets/icons/chat/icon-chat-mcp.png'
-import iconLogo from '@/assets/icons/chat/icon-jh.png'
 
-const router = useRouter()
 const route = useRoute()
 const sidebarStore = useSidebarStore()
 const chatStore = useChatStore()
 
 const isChatActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
-const isSkillsMarketActive = computed(() => route.path === '/skills-market')
-const isSchedTaskActive = computed(() => route.path === '/app-connection')
-const isMcpManagementActive = computed(() => route.path === '/mcp-management')
 
 const emit = defineEmits<{
   navClick: [item: NavItem]
@@ -165,63 +157,6 @@ defineExpose({
             aria-hidden="true"
           ></span>
           <span v-if="!sidebarStore.collapsed">新建对话</span>
-        </button>
-      </el-tooltip>
-
-      <el-tooltip content="技能库" v-bind="sidebarTooltipProps" :disabled="!sidebarStore.collapsed">
-        <button
-          class="grouped-sidebar__nav-btn"
-          :class="{ 'grouped-sidebar__nav-btn--active': isSkillsMarketActive }"
-          type="button"
-          @click="router.push('/skills-market')"
-        >
-          <span
-            class="grouped-sidebar__nav-btn-icon"
-            :style="{ '--nav-btn-icon': `url(${iconNavSkills})` }"
-            aria-hidden="true"
-          ></span>
-          <span v-if="!sidebarStore.collapsed">技能库</span>
-        </button>
-      </el-tooltip>
-
-      <!-- 暂时屏蔽任务计划入口 -->
-      <!-- <el-tooltip
-        content="任务计划"
-        v-bind="sidebarTooltipProps"
-        :disabled="!sidebarStore.collapsed"
-      >
-        <button
-          class="grouped-sidebar__nav-btn"
-          :class="{ 'grouped-sidebar__nav-btn--active': isSchedTaskActive }"
-          type="button"
-          @click="router.push('/app-connection')"
-        >
-          <span
-            class="grouped-sidebar__nav-btn-icon"
-            :style="{ '--nav-btn-icon': `url(${iconNavPlan})` }"
-            aria-hidden="true"
-          ></span>
-          <span v-if="!sidebarStore.collapsed">任务计划</span>
-        </button>
-      </el-tooltip> -->
-
-      <el-tooltip
-        content="MCP 专区"
-        v-bind="sidebarTooltipProps"
-        :disabled="!sidebarStore.collapsed"
-      >
-        <button
-          class="grouped-sidebar__nav-btn"
-          :class="{ 'grouped-sidebar__nav-btn--active': isMcpManagementActive }"
-          type="button"
-          @click="router.push('/mcp-management')"
-        >
-          <span
-            class="grouped-sidebar__nav-btn-icon"
-            :style="{ '--nav-btn-icon': `url(${iconNavMcp})` }"
-            aria-hidden="true"
-          ></span>
-          <span v-if="!sidebarStore.collapsed">MCP 专区</span>
         </button>
       </el-tooltip>
 

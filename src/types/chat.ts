@@ -31,6 +31,19 @@ export interface ToolCallGroup {
   isExpanded: boolean
 }
 
+/** 消息中携带的警员信息 */
+export interface MessageOfficer {
+  id: number
+  officer_name: string
+  skills?: Array<{ id: number; name: string }>
+}
+
+/** 消息中携带的 MCP 服务信息 */
+export interface MessageMcp {
+  id: number
+  service_name: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -46,6 +59,10 @@ export interface Message {
     description?: string
     category?: string
   }>
+  /** 选中的数字警员（含关联技能） */
+  officers?: MessageOfficer[]
+  /** 选中的 MCP 服务 */
+  mcps?: MessageMcp[]
   contentBlocks?: MessageContentBlock[]
   toolCallGroups?: ToolCallGroup[]
   thinkingBlocks?: ThinkingBlock[]

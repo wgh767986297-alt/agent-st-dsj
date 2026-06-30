@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { setThemePageOverride } from '@/composables/useTheme'
-import { isAdminAccount, isLoggedIn } from '@/utils/auth'
+import { isAdminAccount, isDepartmentAdmin, isLoggedIn, isSecurityAuditor } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -14,7 +14,7 @@ const routes: RouteRecordRaw[] = [
         path: 'chat',
         name: 'Chat',
         component: () => import('@/views/ChatView.vue'),
-        meta: { title: '情指助手', requiresAuth: true },
+        meta: { title: '苏小智', requiresAuth: true },
       },
     ],
   },
@@ -25,16 +25,10 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '登录', requiresAuth: false },
   },
   {
-    path: '/register',
-    name: 'Register',
-    component: () => import('@/views/RegisterView.vue'),
-    meta: { title: '注册', requiresAuth: false },
-  },
-  {
     path: '/admin-management',
     name: 'AdminManagement',
     component: () => import('@/views/AdminManagementView.vue'),
-    meta: { title: '后台管理', requiresAuth: true, requiresAdmin: true },
+    meta: { title: '后台管理', requiresAuth: true, requiresManager: true },
   },
   {
     path: '/account-audit',
@@ -46,7 +40,7 @@ const routes: RouteRecordRaw[] = [
     path: '/log-query',
     name: 'LogQuery',
     component: () => import('@/views/LogQueryView.vue'),
-    meta: { title: '日志查询', requiresAuth: true, requiresAdmin: true },
+    meta: { title: '安全审计', requiresAuth: true, requiresAudit: true },
   },
   {
     path: '/model-management',
@@ -55,40 +49,28 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '模型管理', requiresAuth: true, requiresAdmin: true },
   },
   {
-    path: '/knowledge-base',
-    name: 'KnowledgeBase',
-    component: () => import('@/views/KnowledgeBaseView.vue'),
-    meta: { title: '知识库', requiresAuth: true },
-  },
-  {
-    path: '/expert-center',
-    name: 'ExpertCenter',
-    component: () => import('@/views/ExpertCenterView.vue'),
-    meta: { title: '专家中心', requiresAuth: true },
-  },
-  {
-    path: '/smart-warning',
-    name: 'SmartWarning',
-    component: () => import('@/views/SmartWarningView.vue'),
-    meta: { title: '智能预警', requiresAuth: true },
-  },
-  {
     path: '/skills-market',
     name: 'SkillsMarket',
     component: () => import('@/views/ChatView.vue'),
     meta: { title: '技能库', requiresAuth: true },
   },
   {
-    path: '/app-connection',
-    name: 'AppConnection',
-    component: () => import('@/views/ChatView.vue'),
-    meta: { title: '任务计划', requiresAuth: true },
-  },
-  {
     path: '/mcp-management',
     name: 'McpManagement',
     component: () => import('@/views/ChatView.vue'),
     meta: { title: 'MCP 专区', requiresAuth: true },
+  },
+  {
+    path: '/digital-police',
+    name: 'DigitalPolice',
+    component: () => import('@/views/DigitalPoliceView.vue'),
+    meta: { title: '数字警员库', requiresAuth: true },
+  },
+  {
+    path: '/my-permissions',
+    name: 'MyPermissions',
+    component: () => import('@/views/MyPermissionsView.vue'),
+    meta: { title: '我的权限', requiresAuth: true },
   },
 ]
 
@@ -112,7 +94,15 @@ router.beforeEach((to) => {
     return '/'
   }
 
-  if (['/login', '/register'].includes(to.path) && isLoggedIn()) {
+  if (to.meta.requiresAudit && !(isAdminAccount() || isSecurityAuditor())) {
+    return '/'
+  }
+
+  if (to.meta.requiresManager && !(isAdminAccount() || isDepartmentAdmin())) {
+    return '/'
+  }
+
+  if (['/login'].includes(to.path) && isLoggedIn()) {
     return '/'
   }
 

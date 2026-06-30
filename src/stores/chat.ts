@@ -413,6 +413,10 @@ export const useChatStore = defineStore('chat', () => {
       apiContent?: string
       skill?: Message['skill']
       skills?: Message['skills']
+      officers?: Message['officers']
+      mcps?: Message['mcps']
+      skill_key?: string[]
+      mcp_identifiers?: string[]
       modelName?: string | null
     } = {},
   ) => {
@@ -466,6 +470,8 @@ export const useChatStore = defineStore('chat', () => {
       timestamp: Date.now(),
       skill: options.skill,
       skills: options.skills,
+      officers: options.officers,
+      mcps: options.mcps,
       files: uploadedFiles.value
         .filter((f) => f.status === 'success')
         .map((f) => ({
@@ -546,6 +552,11 @@ export const useChatStore = defineStore('chat', () => {
         },
         undefined, // onBehaviorSensitive
         requestController?.signal,
+        // skill_key & mcp_identifiers 附加数据
+        {
+          ...(options.skill_key?.length ? { skill_key: options.skill_key } : {}),
+          ...(options.mcp_identifiers?.length ? { mcp_identifiers: options.mcp_identifiers } : {}),
+        },
       )
 
       // 流式完成后的清理

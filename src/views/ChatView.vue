@@ -3,41 +3,49 @@ import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
-import { ElScrollbar, ElInput, ElButton, ElMessage, ElPopover } from 'element-plus'
 import {
-  ArrowRight,
+  ElScrollbar,
+  ElInput,
+  ElButton,
+  ElMessage,
+  ElIcon,
+  ElTooltip,
+  ElPopover,
+} from 'element-plus'
+import {
   ArrowDown,
-  ArrowLeft,
   Close,
   CopyDocument,
   Refresh,
   Check,
-  Monitor,
-  Setting,
-  SwitchButton,
   Connection,
+  ChatDotSquare,
+  Delete,
+  Edit,
+  MoreFilled,
 } from '@element-plus/icons-vue'
-import type { HistoryItem, NavItem, NavChildItem, Message } from '@/types/chat'
-import { getQbcCountList } from '@/api/functionApis'
-import { preloadSkillsCache, searchCachedSkills, type SkillApiItem } from '@/api/skillsMarket'
+import type { HistoryItem, Message } from '@/types/chat'
+import ActionDialog from '@/components/common/ActionDialog.vue'
+import { skillManageApi, type SkillItem as SkillManageItem } from '@/api/skillManage'
 import { getModelList, type ModelConfig } from '@/api/modelManagement'
 import SmartMessageRenderer from '@/components/chat/SmartMessageRenderer.vue'
-import GroupedSidebarNav from '@/components/layout/GroupedSidebarNav.vue'
 import ConversationToc from '@/components/chat/ConversationToc.vue'
 import AppendixHistoryPanel from '@/components/chat/AppendixHistoryPanel.vue'
-import AppConnectionView from '@/views/AppConnectionView.vue'
 import SensitiveWordDialog from '@/components/chat/SensitiveWordDialog.vue'
-import SystemSettingsDialog from '@/components/settings/SystemSettingsDialog.vue'
 import SkillsMarketView from '@/views/SkillsMarketView.vue'
 import McpManagementView from '@/views/McpManagementView.vue'
-import userIconPng from '@/assets/icons/setting/icon-setting-user.png'
-import { listMcpServices, type McpServiceItem } from '@/api/mcpService'
+import { listEnabledMcpServices, type McpServiceItem } from '@/api/mcpService'
+import { officerApi, type OfficerItem } from '@/api/officer'
 import { useScrollManager } from '@/composables/useScrollManager'
 import { useLongPress } from '@/composables/useLongPress'
-import { clearAuth, getStoredUserProfile, isAdminAccount } from '@/utils/auth'
+import { isAdminAccount } from '@/utils/auth'
 
 import arrowBottomIcon from '@/assets/icons/chat/icon-chat-arrow-bottom.png'
+import iconNavOpen from '@/assets/icons/nav/icon-nav-open.png'
+import iconNavHistory from '@/assets/icons/nav/icon-nav-history.png'
+import iconNewChat from '@/assets/icons/nav/icon-nav-chat.png'
 import './styles/ChatView.css'
+import '@/components/layout/GroupedSidebarNav.css'
 
 // Store
 const chatStore = useChatStore()
@@ -45,31 +53,62 @@ const sidebarStore = useSidebarStore()
 const router = useRouter()
 const route = useRoute()
 
-// User menu
-const userProfile = computed(() => getStoredUserProfile())
-const userDisplayName = computed(() => userProfile.value?.name || 'Admin User')
-const userDepartment = computed(
-  () => userProfile.value?.department || userProfile.value?.company || '情报指挥中心',
+// Sidebar — only show on chat (做一做) routes
+const isChatView = computed(
+  () => !['/skills-market', '/mcp-management'].includes(route.path),
 )
-const showAdminManagement = computed(() => isAdminAccount())
-const userMenuVisible = ref(false)
-const settingsVisible = ref(false)
+const sidebarTooltipProps = {
+  placement: 'right' as const,
+  trigger: 'hover' as const,
+  showArrow: false,
+  persistent: false,
+  enterable: false,
+  hideAfter: 0,
+  focusOnTarget: false,
+  triggerKeys: [] as string[],
+  popperClass: 'grouped-sidebar-tooltip',
+} as const
 
-const handleSystemSettings = () => {
-  userMenuVisible.value = false
-  settingsVisible.value = true
+// Sidebar delete dialog
+const sidebarDeleteVisible = ref(false)
+const sidebarDeleteTargetId = ref<string | null>(null)
+const showSidebarDelete = (historyId: string) => {
+  sidebarDeleteTargetId.value = historyId
+  sidebarDeleteVisible.value = true
+}
+const handleSidebarDeleteConfirm = async () => {
+  if (sidebarDeleteTargetId.value) {
+    await chatStore.deleteHistory(sidebarDeleteTargetId.value)
+  }
+  sidebarDeleteVisible.value = false
+  sidebarDeleteTargetId.value = null
 }
 
-const handleAdminManagement = async () => {
-  userMenuVisible.value = false
-  const adminUrl = window.location.origin + '/admin-management'
-  window.open(adminUrl, '_blank')
+// Sidebar rename dialog
+const sidebarRenameVisible = ref(false)
+const sidebarRenameTarget = ref<HistoryItem | null>(null)
+const showSidebarRename = (history: HistoryItem) => {
+  sidebarRenameTarget.value = history
+  sidebarRenameVisible.value = true
+}
+const handleSidebarRenameConfirm = async (value?: string) => {
+  if (
+    value &&
+    value.trim() &&
+    sidebarRenameTarget.value &&
+    value.trim() !== sidebarRenameTarget.value.title
+  ) {
+    await chatStore.renameHistory(sidebarRenameTarget.value.id, value.trim())
+  }
+  sidebarRenameVisible.value = false
+  sidebarRenameTarget.value = null
 }
 
-const handleLogout = async () => {
-  userMenuVisible.value = false
-  clearAuth()
-  await router.replace('/login')
+// Sidebar collapsed history popover
+const sidebarHistoryPopoverVisible = ref(false)
+const handleSidebarHistoryClick = (history: HistoryItem) => {
+  sidebarHistoryPopoverVisible.value = false
+  handleHistoryClick(history)
 }
 
 // Composables
@@ -121,8 +160,7 @@ const loadMcpList = async () => {
   if (mcpList.value.length > 0 || mcpListLoading.value) return
   mcpListLoading.value = true
   try {
-    const response = await listMcpServices(200, true)
-    mcpList.value = response.items || []
+    mcpList.value = await listEnabledMcpServices(200)
   } catch {
     // 静默失败，MCP 选择器显示为空
   } finally {
@@ -140,9 +178,38 @@ const toggleMcp = (mcp: McpServiceItem) => {
 const removeMcp = (id: number) => {
   selectedMcps.value = selectedMcps.value.filter((m) => m.id !== id)
 }
+
+// 数字警员选择
+const officerPopoverVisible = ref(false)
+const selectedOfficers = ref<OfficerItem[]>([])
+const officerList = ref<OfficerItem[]>([])
+const officerListLoading = ref(false)
+
+const loadOfficerList = async () => {
+  if (officerList.value.length > 0 || officerListLoading.value) return
+  officerListLoading.value = true
+  try {
+    officerList.value = await officerApi.list()
+  } catch {
+    officerList.value = []
+  } finally {
+    officerListLoading.value = false
+  }
+}
+const isOfficerSelected = (officer: OfficerItem) =>
+  selectedOfficers.value.some((o) => o.id === officer.id)
+const toggleOfficer = (officer: OfficerItem) => {
+  if (isOfficerSelected(officer)) {
+    selectedOfficers.value = selectedOfficers.value.filter((o) => o.id !== officer.id)
+  } else {
+    selectedOfficers.value.push(officer)
+  }
+}
+const removeOfficer = (id: number) => {
+  selectedOfficers.value = selectedOfficers.value.filter((o) => o.id !== id)
+}
 let skillSearchTimer: number | null = null
 let skillSearchRequestId = 0
-const sidebarNavRef = ref<InstanceType<typeof GroupedSidebarNav> | null>(null)
 const messagesAreaRef = ref<HTMLDivElement | null>(null)
 const activeMessageId = ref<string | null>(null)
 const attachmentDialogVisible = ref(false)
@@ -220,8 +287,6 @@ const refreshAppendixHistory = async () => {
 }
 
 let scrollMessageRAF: number | null = null
-
-const navItems = computed(() => sidebarNavRef.value?.navItems || [])
 
 // 响应式检测
 const isMobile = ref(window.innerWidth <= 768)
@@ -306,13 +371,13 @@ const resolveSelectedModelName = () => {
   return firstModelName
 }
 
-const normalizeSkillItem = (skill: SkillApiItem): SelectedSkill | null => {
-  const name = skill.name?.trim()
+const normalizeSkillItem = (skill: SkillManageItem): SelectedSkill | null => {
+  const name = skill.skill_name?.trim()
   if (!name) return null
   return {
     name,
     description: skill.description?.trim() || '',
-    category: skill.category || '',
+    category: skill.skill_type || '',
   }
 }
 
@@ -356,9 +421,9 @@ const loadSkillSuggestions = async (query: string) => {
   const requestId = ++skillSearchRequestId
   skillSuggestLoading.value = true
   try {
-    const response = await searchCachedSkills(query, 5)
+    const { list } = await skillManageApi.list({ keyword: query || undefined, limit: 5, is_public: true })
     if (requestId !== skillSearchRequestId) return
-    const nextSuggestions = response
+    const nextSuggestions = list
       .map(normalizeSkillItem)
       .filter((skill): skill is SelectedSkill => !!skill)
       .slice(0, 5)
@@ -427,11 +492,6 @@ const syncSkillMentionState = (_value: string) => {
   // 暂时屏蔽 @技能 功能
   skillSuggestVisible.value = false
   skillMentionQuery.value = ''
-}
-
-const buildSkillApiContent = (content: string, skills: SelectedSkill[]) => {
-  if (skills.length === 0) return content
-  return `${skills.map((skill) => `@${skill.name}`).join(' ')} ${content}`
 }
 
 const userMessages = computed(() => {
@@ -573,7 +633,20 @@ watch(currentInput, (newVal) => {
 const sendCurrentMessage = async () => {
   const message = currentInput.value.trim()
   const skillsForMessage = selectedSkills.value.map((skill) => ({ ...skill }))
-  const apiMessage = buildSkillApiContent(message, skillsForMessage)
+  let apiMessage = message
+
+  // 静默拼接数字警员系统提示词到 query 前面（不展示在用户消息中）
+  const officerPrompts = selectedOfficers.value
+    .map((o) => {
+      const cfg = o.config as Record<string, unknown> | undefined
+      return (typeof cfg?.systemPrompt === 'string' && cfg.systemPrompt)
+        || (typeof cfg?.prompt === 'string' && cfg.prompt)
+        || ''
+    })
+    .filter(Boolean)
+  if (officerPrompts.length > 0) {
+    apiMessage = `${officerPrompts.join('\n')}\n${apiMessage}`
+  }
 
   if (message) {
     const uploadingFiles = chatStore.uploadedFiles.filter((f) => f.status === 'uploading')
@@ -585,8 +658,50 @@ const sendCurrentMessage = async () => {
       (f) => f.status === 'success' && f.file_id,
     )
 
+    // 收集选中警员的关联技能 + MCP，同时构建展示用数据
+    const officersForMessage: Message['officers'] = []
+    const skillKeys: string[] = []
+    const mcpIdentifiers: string[] = []
+
+    if (selectedOfficers.value.length > 0) {
+      const officerResources = await Promise.allSettled(
+        selectedOfficers.value.map(o => officerApi.getResources(o.id))
+      )
+      selectedOfficers.value.forEach((o, i) => {
+        const result = officerResources[i]
+        const resources = (result?.status === 'fulfilled' ? result.value : []) as any[]
+        const skills = resources
+          .filter((r: any) => r.resource_type === 'skill')
+          .map((r: any) => ({ id: r.resource_id, name: r.resource_name || '' }))
+        officersForMessage.push({
+          id: o.id,
+          officer_name: o.officer_name,
+          skills,
+        })
+        // 从警员资源中收集 skill_key 和 mcp_identifiers
+        resources.forEach((r: any) => {
+          if (r.resource_type === 'skill') {
+            skillKeys.push(String(r.resource_id))
+          } else if (r.resource_type === 'mcp') {
+            mcpIdentifiers.push(String(r.resource_id))
+          }
+        })
+      })
+    }
+
+    // 收集直接选中的 MCP（展示用 + 标识符）
+    const mcpsForMessage: Message['mcps'] = selectedMcps.value.map(m => {
+      mcpIdentifiers.push(String(m.id))
+      return {
+        id: m.id,
+        service_name: m.service_name,
+      }
+    })
+
     currentInput.value = ''
     selectedSkills.value = []
+    selectedOfficers.value = []
+    selectedMcps.value = []
     skillSuggestVisible.value = false
     await nextTick()
 
@@ -598,6 +713,10 @@ const sendCurrentMessage = async () => {
     await chatStore.sendMessage(message, undefined, {
       apiContent: apiMessage,
       skills: skillsForMessage,
+      officers: officersForMessage.length > 0 ? officersForMessage : undefined,
+      mcps: mcpsForMessage.length > 0 ? mcpsForMessage : undefined,
+      skill_key: [...new Set(skillKeys)],
+      mcp_identifiers: [...new Set(mcpIdentifiers)],
       modelName: resolveSelectedModelName() || null,
     })
     await nextTick()
@@ -716,9 +835,19 @@ const formatFileSize = (bytes: number): string => {
 const getFileTypeLabel = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   const map: Record<string, string> = {
-    pdf: 'PDF', doc: 'DOC', docx: 'DOCX', xls: 'XLS', xlsx: 'XLSX',
-    csv: 'CSV', txt: 'TXT', md: 'MD',
-    png: 'IMG', jpg: 'IMG', jpeg: 'IMG', gif: 'IMG', webp: 'IMG',
+    pdf: 'PDF',
+    doc: 'DOC',
+    docx: 'DOCX',
+    xls: 'XLS',
+    xlsx: 'XLSX',
+    csv: 'CSV',
+    txt: 'TXT',
+    md: 'MD',
+    png: 'IMG',
+    jpg: 'IMG',
+    jpeg: 'IMG',
+    gif: 'IMG',
+    webp: 'IMG',
   }
   return map[ext] || ext.toUpperCase() || 'FILE'
 }
@@ -770,33 +899,6 @@ const handleQuoteAppendix = (item: { file_id: string; file_name: string; file_ur
   })
 }
 
-const handleNavClick = (item: NavItem) => {
-  if (item.children?.length) {
-    sidebarStore.toggleMenu(item.id)
-    sidebarStore.setActiveSubMenu(null)
-  } else if (item.link) {
-    sidebarStore.setActiveSubMenu(null)
-    sidebarStore.setActiveNav(item.id)
-  } else {
-    sidebarStore.setActiveNav(item.id)
-    sidebarStore.setActiveSubMenu(null)
-  }
-}
-
-const handleSubmenuClick = (child: NavChildItem) => {
-  if (!child.link) {
-    ElMessage.info('该功能正在开发中')
-    return
-  }
-  const parentItem = navItems.value.find((item) => item.children?.some((c) => c.id === child.id))
-  sidebarStore.setActiveSubMenu(child.id)
-  if (parentItem) {
-    sidebarStore.setActiveNav(parentItem.id)
-  } else {
-    sidebarStore.setActiveNav(child.id)
-  }
-}
-
 const handleHistoryClick = (history: HistoryItem, event?: MouseEvent | TouchEvent) => {
   if (isLongPressing.value || longPressId.value === history.id) {
     longPressId.value = null
@@ -833,7 +935,7 @@ const handleHistoryClick = (history: HistoryItem, event?: MouseEvent | TouchEven
 
 const handleNewChat = async () => {
   // 如果当前在嵌入式页面（定时任务/技能库/MCP管理），先回到聊天视图
-  if (['/app-connection', '/skills-market', '/mcp-management'].includes(route.path)) {
+  if (['/skills-market', '/mcp-management'].includes(route.path)) {
     await router.replace('/')
     await nextTick()
   }
@@ -846,9 +948,13 @@ const handleNewChat = async () => {
 }
 
 onMounted(async () => {
+  // 嵌入式页面（技能库/MCP专区/数字警员库）不需要聊天相关初始化
+  if (!isChatView.value) return
+
   inputTextarea.value?.focus()
-  preloadSkillsCache().catch((error) => {})
   loadAnswerModels()
+  loadOfficerList()
+  loadMcpList()
   // 打字机效果：立即触发，不等待历史列表加载
   if (!chatStore.hasMessages) {
     startWelcomeTyping()
@@ -856,8 +962,6 @@ onMounted(async () => {
 
   await chatStore.refreshHistoryList()
   chatStore.generateUser()
-
-  await getQbcCountList()
 
   isUserScrolling.value = false
   isAtBottom.value = true
@@ -1000,26 +1104,256 @@ onUnmounted(() => {
 
 <template>
   <div class="ai-assistant-app">
-    <!-- 侧边导航栏 -->
-    <GroupedSidebarNav
-      ref="sidebarNavRef"
-      @nav-click="handleNavClick"
-      @submenu-click="handleSubmenuClick"
-      @new-chat="handleNewChat"
-      @history-click="handleHistoryClick"
-      @open-settings="settingsVisible = true"
+    <!-- 侧边栏：仅在做一做（问答）页面显示 -->
+    <aside
+      v-if="isChatView"
+      class="grouped-sidebar"
+      :class="{ 'grouped-sidebar--collapsed': sidebarStore.collapsed }"
+    >
+      <div class="grouped-sidebar__brand">
+        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__brand-copy">
+          <div class="grouped-sidebar__title">历史对话</div>
+        </div>
+        <el-tooltip
+          :content="sidebarStore.collapsed ? '展开导航栏' : '收起导航栏'"
+          v-bind="sidebarTooltipProps"
+        >
+          <button
+            class="grouped-sidebar__collapse-button"
+            type="button"
+            :aria-label="sidebarStore.collapsed ? '展开导航栏' : '收起导航栏'"
+            @click="sidebarStore.toggleCollapse()"
+          >
+            <span
+              class="grouped-sidebar__collapse-icon"
+              :style="{ '--collapse-icon': `url(${iconNavOpen})` }"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </el-tooltip>
+      </div>
+
+      <div class="grouped-sidebar__qa">
+        <!-- 新建对话 -->
+        <el-tooltip
+          content="新建对话"
+          v-bind="sidebarTooltipProps"
+          :disabled="!sidebarStore.collapsed"
+        >
+          <button
+            v-if="!chatStore.isHistoryRefreshing"
+            class="grouped-sidebar__nav-btn grouped-sidebar__nav-btn--active"
+            type="button"
+            @click="handleNewChat"
+          >
+            <span
+              class="grouped-sidebar__nav-btn-icon"
+              :style="{ '--nav-btn-icon': `url(${iconNewChat})` }"
+              aria-hidden="true"
+            ></span>
+            <span v-if="!sidebarStore.collapsed">新建对话</span>
+          </button>
+        </el-tooltip>
+
+        <!-- 收起时的历史记录弹窗 -->
+        <el-popover
+          v-if="sidebarStore.collapsed"
+          v-model:visible="sidebarHistoryPopoverVisible"
+          placement="right-start"
+          trigger="click"
+          :width="286"
+          :show-arrow="false"
+          popper-class="grouped-sidebar-history-popover"
+        >
+          <div class="grouped-sidebar__history-popover">
+            <div class="grouped-sidebar__history-popover-title">对话历史</div>
+            <div
+              v-if="chatStore.isHistoryRefreshing"
+              class="grouped-sidebar__history-popover-empty"
+            >
+              正在加载...
+            </div>
+            <el-scrollbar v-else class="grouped-sidebar__history-popover-list">
+              <div
+                v-for="history in chatStore.historyList"
+                :key="history.id"
+                class="grouped-sidebar__history-popover-item"
+                :class="{
+                  'grouped-sidebar__history-popover-item--active':
+                    history.id === chatStore.currentHistoryId,
+                }"
+                @click="handleSidebarHistoryClick(history)"
+              >
+                <span class="grouped-sidebar__history-icon-circle">
+                  <el-icon :size="14"><ChatDotSquare /></el-icon>
+                </span>
+                <div class="grouped-sidebar__history-popover-copy">
+                  <span class="grouped-sidebar__history-popover-name">{{ history.title }}</span>
+                </div>
+                <el-popover
+                  placement="bottom-end"
+                  trigger="click"
+                  :width="140"
+                  :show-arrow="false"
+                  popper-class="grouped-sidebar-history-action-popover"
+                >
+                  <div class="grouped-sidebar__history-action-menu">
+                    <button
+                      class="grouped-sidebar__history-action-item"
+                      type="button"
+                      @click.stop="showSidebarRename(history)"
+                    >
+                      <el-icon><Edit /></el-icon>
+                      <span>重命名</span>
+                    </button>
+                    <button
+                      class="grouped-sidebar__history-action-item grouped-sidebar__history-action-item--danger"
+                      type="button"
+                      @click.stop="showSidebarDelete(history.id)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                      <span>删除</span>
+                    </button>
+                  </div>
+                  <template #reference>
+                    <button
+                      class="grouped-sidebar__history-popover-more"
+                      type="button"
+                      aria-label="更多操作"
+                      @click.stop
+                    >
+                      <el-icon><MoreFilled /></el-icon>
+                    </button>
+                  </template>
+                </el-popover>
+              </div>
+              <div
+                v-if="chatStore.historyList.length === 0"
+                class="grouped-sidebar__history-popover-empty"
+              >
+                暂无历史记录
+              </div>
+            </el-scrollbar>
+          </div>
+          <template #reference>
+            <span class="grouped-sidebar__popover-reference">
+              <el-tooltip content="对话历史" v-bind="sidebarTooltipProps">
+                <button class="grouped-sidebar__history-trigger" type="button">
+                  <span
+                    class="grouped-sidebar__history-icon"
+                    :style="{ '--history-icon': `url(${iconNavHistory})` }"
+                    aria-hidden="true"
+                  ></span>
+                </button>
+              </el-tooltip>
+            </span>
+          </template>
+        </el-popover>
+
+        <!-- 展开时的历史记录列表 -->
+        <div
+          v-if="!sidebarStore.collapsed && chatStore.isHistoryRefreshing"
+          class="grouped-sidebar__history-loading"
+          aria-busy="true"
+        >
+          <div class="grouped-sidebar__history-loading-skeleton">
+            <div v-for="index in 4" :key="index" class="grouped-sidebar__history-loading-card">
+              <div
+                class="grouped-sidebar__history-loading-line grouped-sidebar__history-loading-line--title"
+              ></div>
+              <div
+                class="grouped-sidebar__history-loading-line grouped-sidebar__history-loading-line--meta"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <el-scrollbar
+          v-if="!sidebarStore.collapsed && !chatStore.isHistoryRefreshing"
+          class="grouped-sidebar__history"
+        >
+          <div
+            v-for="history in chatStore.historyList"
+            :key="history.id"
+            class="grouped-sidebar__history-item"
+            :class="{
+              'grouped-sidebar__history-item--active': history.id === chatStore.currentHistoryId,
+            }"
+            @click="handleHistoryClick(history)"
+          >
+            <span class="grouped-sidebar__history-icon-circle">
+              <el-icon :size="14"><ChatDotSquare /></el-icon>
+            </span>
+            <div class="grouped-sidebar__history-copy">
+              <div class="grouped-sidebar__history-name">{{ history.title }}</div>
+            </div>
+            <el-popover
+              placement="bottom-end"
+              trigger="click"
+              :width="140"
+              :show-arrow="false"
+              popper-class="grouped-sidebar-history-action-popover"
+            >
+              <div class="grouped-sidebar__history-action-menu">
+                <button
+                  class="grouped-sidebar__history-action-item"
+                  type="button"
+                  @click.stop="showSidebarRename(history)"
+                >
+                  <el-icon><Edit /></el-icon>
+                  <span>重命名</span>
+                </button>
+                <button
+                  class="grouped-sidebar__history-action-item grouped-sidebar__history-action-item--danger"
+                  type="button"
+                  @click.stop="showSidebarDelete(history.id)"
+                >
+                  <el-icon><Delete /></el-icon>
+                  <span>删除</span>
+                </button>
+              </div>
+              <template #reference>
+                <button
+                  class="grouped-sidebar__history-more"
+                  type="button"
+                  aria-label="更多操作"
+                  @click.stop
+                >
+                  <el-icon><MoreFilled /></el-icon>
+                </button>
+              </template>
+            </el-popover>
+          </div>
+        </el-scrollbar>
+      </div>
+    </aside>
+
+    <!-- 侧边栏删除/重命名弹窗 -->
+    <ActionDialog
+      v-model:visible="sidebarDeleteVisible"
+      type="confirm"
+      title="确定要删除这条对话记录吗？"
+      description="删除后将无法恢复，请谨慎操作。"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      :danger="true"
+      @confirm="handleSidebarDeleteConfirm"
+    />
+    <ActionDialog
+      v-model:visible="sidebarRenameVisible"
+      type="prompt"
+      title="重命名对话"
+      :input-value="sidebarRenameTarget?.title || ''"
+      input-placeholder="请输入新的对话标题"
+      confirm-text="确认修改"
+      cancel-text="取消"
+      @confirm="handleSidebarRenameConfirm"
     />
 
     <!-- 主内容区 -->
-    <main class="main-content" :class="{ 'main-content--sched': route.path === '/app-connection' }">
-      <!-- 定时任务视图（嵌入 main-content，隐藏返回按钮） -->
-      <div v-if="route.path === '/app-connection'" class="sched-embedded">
-        <AppConnectionView embedded />
-      </div>
-
+    <main class="main-content">
       <!-- 技能库视图（嵌入 main-content） -->
       <div
-        v-else-if="route.path === '/skills-market'"
+        v-if="route.path === '/skills-market'"
         class="sched-embedded skills-market-embedded"
       >
         <SkillsMarketView embedded />
@@ -1035,72 +1369,6 @@ onUnmounted(() => {
 
       <!-- 聊天视图 -->
       <template v-else>
-        <!-- 用户按钮 -->
-        <div class="main-content__user">
-          <el-popover
-            v-model:visible="userMenuVisible"
-            placement="bottom-end"
-            trigger="click"
-            :width="240"
-            :show-arrow="false"
-            popper-class="chat-user-popover"
-          >
-            <div class="chat-user-popover__inner">
-              <!-- 用户信息 -->
-              <div class="chat-user-popover__profile">
-                <div class="chat-user-popover__avatar">
-                  <span
-                    class="chat-user-popover__avatar-icon"
-                    :style="{ maskImage: `url(${userIconPng})`, WebkitMaskImage: `url(${userIconPng})` }"
-                  ></span>
-                </div>
-                <div class="chat-user-popover__info">
-                  <div class="chat-user-popover__name">{{ userDisplayName }}</div>
-                  <div class="chat-user-popover__dept">{{ userDepartment }}</div>
-                </div>
-              </div>
-              <!-- 分隔线 -->
-              <div class="chat-user-popover__divider"></div>
-              <!-- 菜单选项 -->
-              <div class="chat-user-popover__menu">
-                <button
-                  v-if="showAdminManagement"
-                  class="chat-user-popover__menu-item"
-                  type="button"
-                  @click="handleAdminManagement"
-                >
-                  <el-icon><Monitor /></el-icon>
-                  <span>后台管理</span>
-                </button>
-                <button
-                  class="chat-user-popover__menu-item"
-                  type="button"
-                  @click="handleSystemSettings"
-                >
-                  <el-icon><Setting /></el-icon>
-                  <span>系统设置</span>
-                </button>
-                <button
-                  class="chat-user-popover__menu-item chat-user-popover__menu-item--danger"
-                  type="button"
-                  @click="handleLogout"
-                >
-                  <el-icon><SwitchButton /></el-icon>
-                  <span>退出登录</span>
-                </button>
-              </div>
-            </div>
-            <template #reference>
-              <button class="main-content__user-btn" type="button" aria-label="用户设置">
-                <span
-                  class="main-content__user-icon"
-                  :style="{ maskImage: `url(${userIconPng})`, WebkitMaskImage: `url(${userIconPng})` }"
-                ></span>
-              </button>
-            </template>
-          </el-popover>
-        </div>
-
         <!-- 附件中心弹窗 -->
         <AppendixHistoryPanel
           ref="appendixHistoryPanelRef"
@@ -1136,6 +1404,32 @@ onUnmounted(() => {
                 :id="`msg-${msg.id}`"
                 :class="{ 'user-message': msg.role === 'user' }"
               >
+                <!-- 数字警员 & MCP 标签（消息框外上方） -->
+                <div
+                  v-if="msg.role === 'user' && (msg.officers?.length || msg.mcps?.length)"
+                  class="message-resource-tags-outside"
+                >
+                  <div
+                    v-for="officer in msg.officers"
+                    :key="'officer-' + officer.id"
+                    class="message-resource-tag message-resource-tag--officer"
+                  >
+                    <span class="message-resource-tag__icon">👮</span>
+                    <span class="message-resource-tag__name">{{ officer.officer_name }}</span>
+                    <span v-if="officer.skills?.length" class="message-resource-tag__skills">
+                      ({{ officer.skills.map((s) => s.name).join('、') }})
+                    </span>
+                  </div>
+                  <div
+                    v-for="mcp in msg.mcps"
+                    :key="'mcp-' + mcp.id"
+                    class="message-resource-tag message-resource-tag--mcp"
+                  >
+                    <span class="message-resource-tag__icon">🔗</span>
+                    <span class="message-resource-tag__name">MCP·{{ mcp.service_name }}</span>
+                  </div>
+                </div>
+
                 <div class="message" :class="msg.role">
                   <div class="message-avatar">
                     <img
@@ -1192,7 +1486,7 @@ onUnmounted(() => {
                     >
                       <el-button
                         size="small"
-                        type="text"
+                        link
                         @click="copyMessage(msg)"
                         class="action-btn"
                       >
@@ -1211,7 +1505,7 @@ onUnmounted(() => {
                     >
                       <el-button
                         size="small"
-                        type="text"
+                        link
                         @click="regenerateResponse(msg)"
                         class="action-btn"
                       >
@@ -1224,6 +1518,13 @@ onUnmounted(() => {
             </div>
           </div>
         </el-scrollbar>
+
+        <!-- 欢迎语（在聊天区域居中） -->
+        <div v-if="!chatStore.hasMessages" class="welcome-screen">
+          <h1>
+            <span class="typewriter-text">{{ welcomeDisplayedText }}</span>
+          </h1>
+        </div>
 
         <div v-if="showScrollToBottomButton" class="scroll-to-bottom-action">
           <button
@@ -1242,12 +1543,51 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <!-- 底部区域：欢迎语 + 输入框 -->
-        <div class="bottom-section" :class="{ 'bottom-section--welcome': !chatStore.hasMessages }">
-          <div v-if="!chatStore.hasMessages" class="welcome-screen">
-            <h1>
-              <span class="typewriter-text">{{ welcomeDisplayedText }}</span>
-            </h1>
+        <!-- 底部区域：选择区 + 输入框 -->
+        <div class="bottom-section">
+
+          <!-- 警员 / MCP 选择区 -->
+          <div class="resource-select-bar">
+            <!-- 左侧：数字警员 -->
+            <div class="resource-select-half">
+              <div class="resource-select-label">数字警员</div>
+              <div class="resource-chips">
+                <template v-if="officerList.length > 0">
+                  <span
+                    v-for="officer in officerList"
+                    :key="'ro-' + officer.id"
+                    class="resource-chip resource-chip--officer"
+                    :class="{ 'resource-chip--active': isOfficerSelected(officer) }"
+                    @click="toggleOfficer(officer)"
+                  >
+                    <span>{{ officer.officer_name }}</span>
+                  </span>
+                </template>
+                <span v-else class="resource-chip--empty">暂无可选警员</span>
+              </div>
+            </div>
+
+            <!-- 分隔线 -->
+            <div class="resource-select-divider"></div>
+
+            <!-- 右侧：MCP 服务 -->
+            <div class="resource-select-half">
+              <div class="resource-select-label">MCP 服务</div>
+              <div class="resource-chips">
+                <template v-if="mcpList.length > 0">
+                  <span
+                    v-for="mcp in mcpList"
+                    :key="'rm-' + mcp.id"
+                    class="resource-chip resource-chip--mcp"
+                    :class="{ 'resource-chip--active': isMcpSelected(mcp) }"
+                    @click="toggleMcp(mcp)"
+                  >
+                    <span>{{ mcp.service_name }}</span>
+                  </span>
+                </template>
+                <span v-else class="resource-chip--empty">暂无可选MCP</span>
+              </div>
+            </div>
           </div>
 
           <!-- 输入区域 -->
@@ -1268,19 +1608,6 @@ onUnmounted(() => {
                     class="skill-mention-chip__remove"
                     @click="removeSelectedSkill(skill.name)"
                   >
-                    <el-icon size="12"><Close /></el-icon>
-                  </button>
-                </div>
-              </div>
-
-              <!-- MCP 服务标签 -->
-              <div v-if="selectedMcps.length" class="mcp-mention-chips">
-                <div v-for="mcp in selectedMcps" :key="mcp.id" class="mcp-mention-chip">
-                  <span class="mcp-mention-chip__mark">
-                    <el-icon :size="13"><Connection /></el-icon>
-                  </span>
-                  <span class="mcp-mention-chip__name">{{ mcp.name }}</span>
-                  <button type="button" class="mcp-mention-chip__remove" @click="removeMcp(mcp.id)">
                     <el-icon size="12"><Close /></el-icon>
                   </button>
                 </div>
@@ -1339,14 +1666,21 @@ onUnmounted(() => {
                   <!-- 上传成功：文件信息 -->
                   <template v-else-if="file.status === 'success'">
                     <p class="file-card__name">{{ file.filename }}</p>
-                    <p class="file-card__size">{{ file.file ? formatFileSize(file.file.size) : '' }}</p>
+                    <p class="file-card__size">
+                      {{ file.file ? formatFileSize(file.file.size) : '' }}
+                    </p>
                     <span class="file-card__tag">{{ getFileTypeLabel(file.filename) }}</span>
                   </template>
 
                   <!-- 上传失败 -->
                   <template v-else-if="file.status === 'error'">
                     <p class="file-card__name">{{ file.filename }}</p>
-                    <p class="file-card__size file-card__size--error" @click="retryUploadFile(file.filename)">上传失败，点击重试</p>
+                    <p
+                      class="file-card__size file-card__size--error"
+                      @click="retryUploadFile(file.filename)"
+                    >
+                      上传失败，点击重试
+                    </p>
                   </template>
                 </div>
               </div>
@@ -1375,7 +1709,7 @@ onUnmounted(() => {
                     placement="top"
                     :show-after="300"
                   >
-                    <el-button class="upload-btn" type="text" @click="handleFileUpload">
+                    <el-button class="upload-btn" link @click="handleFileUpload">
                       <img
                         src="@/assets/icons/chat/icon-chat-uploadfile.png"
                         alt="上传文件"
@@ -1437,55 +1771,6 @@ onUnmounted(() => {
                       </template>
                     </el-popover>
 
-                    <!-- MCP 按钮 + 弹窗 -->
-                    <el-popover
-                      v-model:visible="mcpPopoverVisible"
-                      placement="top-start"
-                      trigger="click"
-                      :width="280"
-                      :show-arrow="false"
-                      popper-class="mcp-select-popover"
-                      @show="loadMcpList"
-                    >
-                      <div class="mcp-select-panel">
-                        <div class="mcp-select-panel__header">
-                          <span>MCP 服务</span>
-                        </div>
-                        <button
-                          v-for="mcp in mcpList"
-                          :key="mcp.id"
-                          class="mcp-select-option"
-                          :class="{ 'mcp-select-option--active': isMcpSelected(mcp) }"
-                          type="button"
-                          @click="toggleMcp(mcp)"
-                        >
-                          <span class="mcp-select-option__left">
-                            <span class="mcp-select-option__name">{{ mcp.name }}</span>
-                            <span class="mcp-select-option__desc">{{ mcp.description }}</span>
-                          </span>
-                          <el-icon v-if="isMcpSelected(mcp)" color="var(--app-primary)"
-                            ><Check
-                          /></el-icon>
-                        </button>
-                      </div>
-                      <template #reference>
-                        <el-button
-                          class="upload-btn mcp-btn"
-                          :class="{ 'mcp-btn--active': selectedMcps.length > 0 }"
-                          type="text"
-                        >
-                          <img
-                            src="@/assets/icons/chat/icon-chat-mcp.png"
-                            alt="MCP"
-                            style="width: 20px; height: 20px"
-                          />
-                          <span v-if="selectedMcps.length" class="mcp-btn-badge">{{
-                            selectedMcps.length
-                          }}</span>
-                        </el-button>
-                      </template>
-                    </el-popover>
-
                     <!-- 发送按钮 -->
                     <el-button
                       class="send-btn"
@@ -1526,7 +1811,8 @@ onUnmounted(() => {
         </div>
 
         <div class="footer-support">
-          技术支撑：中国电信集团江苏省电信公司、南京浩树科技有限公司，联系人：杨汝乾
+          技术支持：省厅大数据实战总队
+          支撑公司：南京浩树科技有限公司、中电鸿信信息科技有限公司、中国电信集团江苏省电信公司，联系人：杨汝乾
           联系方式：13951626907
         </div>
       </template>
@@ -1539,9 +1825,6 @@ onUnmounted(() => {
       :keywords="chatStore.sensitiveWarning.keywords"
       @close="chatStore.sensitiveWarning.visible = false"
     />
-
-    <!-- 系统设置弹窗 -->
-    <SystemSettingsDialog v-model:visible="settingsVisible" />
   </div>
 </template>
 

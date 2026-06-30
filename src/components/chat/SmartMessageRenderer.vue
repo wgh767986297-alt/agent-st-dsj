@@ -193,7 +193,7 @@ const processActionTags = (content: string): string => {
     const escapedText = escapeHtml(text.trim())
     if (cmd === 'InputChat') {
       // 可点击类型：使用特殊样式 + data 属性存储文本，末尾追加右箭头
-      return `<span class="action-tag action-tag--clickable" data-action-text="${escapedText}">${escapedText}<img class="action-tag__arrow" src="${arrowRightIcon}" alt="" /></span>`
+      return `<span class="action-tag action-tag--clickable" data-action-text="${escapedText}">${escapedText}</span>`
     }
     // 其他 cmd 类型：仅样式区分，不可点击
     return `<span class="action-tag" data-action-cmd="${escapeHtml(cmd)}">${escapedText}</span>`
@@ -520,18 +520,24 @@ const handleActionClick = (e: MouseEvent) => {
   display: inline-flex;
   align-items: center;
   cursor: pointer;
-  padding: 8px 12px;
+  padding: 6px 14px;
   margin-top: 8px;
-  border-radius: 12px;
-  background: var(--app-panel-muted);
-  border: 1px solid var(--app-border);
-  font-size: 14px;
-  transition: background 0.2s ease;
+  background: #fff;
+  border: 1px solid var(--ds-primary-light, #2a5aa0);
+  border-radius: 16px;
+  font-size: 12px;
+  color: var(--ds-primary-light, #2a5aa0);
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
 :deep(.action-tag--clickable:hover) {
-  background: var(--app-hover);
-  font-weight: 600;
+  background: var(--ds-primary-light, #2a5aa0);
+  color: #fff;
+}
+
+:deep(.action-tag--clickable:hover .action-tag__arrow) {
+  filter: brightness(0) saturate(100%) invert(1);
 }
 
 :deep(.action-tag__arrow) {
@@ -541,8 +547,31 @@ const handleActionClick = (e: MouseEvent) => {
 }
 
 :deep(.action-tag--clickable:focus-visible) {
-  outline: 2px solid var(--app-primary);
+  outline: 2px solid var(--ds-primary-light, #2a5aa0);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+/* 深色模式 */
+:root[data-theme='dark'] :deep(.action-tag--clickable) {
+  background: var(--ds-card, rgba(18, 34, 72, 0.7));
+  border-color: rgba(0, 170, 255, 0.3);
+  color: var(--ds-primary-light, #33bbff);
+}
+
+:root[data-theme='dark'] :deep(.action-tag--clickable:hover) {
+  background: var(--ds-primary, #00aaff);
+  color: #fff;
+  border-color: var(--ds-primary, #00aaff);
+}
+
+:root[data-theme='dark'] :deep(.action-tag__arrow) {
+  filter: brightness(0) saturate(100%) invert(1);
+  opacity: 0.82;
+}
+
+:root[data-theme='dark'] :deep(.action-tag--clickable:hover .action-tag__arrow) {
+  filter: brightness(0) saturate(100%) invert(1);
+  opacity: 1;
 }
 </style>
