@@ -302,18 +302,24 @@ export async function superAuditDeleteMcp(
  * 10. 申请下架 MCP
  * POST /dsjpt/jk/mcp/applyRemove.xhtml
  */
-export async function applyRemoveMcp(
-  id: number,
-  delete_reason: string,
-): Promise<McpBaseResponse> {
-  return postApi<McpBaseResponse>('/dsjpt/jk/mcp/applyRemove.xhtml', {
-    id,
-    delete_reason,
-  })
+export async function applyRemoveMcp(id: number): Promise<McpBaseResponse> {
+  return postApi<McpBaseResponse>('/dsjpt/jk/mcp/applyRemove.xhtml', { id })
 }
 
 /**
- * 11. 超级管理员审核下架 MCP
+ * 11. 部门管理员审核下架 MCP dept_audit_status: '05'-通过 '06'-拒绝
+ * POST /dsjpt/jk/mcp/deptAuditRemove.xhtml
+ */
+export async function deptAuditRemoveMcp(
+  id: number,
+  dept_audit_status: '05' | '06',
+  dept_audit_remark?: string,
+): Promise<McpBaseResponse> {
+  return postApi<McpBaseResponse>('/dsjpt/jk/mcp/deptAuditRemove.xhtml', { id, dept_audit_status, dept_audit_remark })
+}
+
+/**
+ * 12. 超级管理员审核下架 MCP
  * POST /dsjpt/jk/mcp/superAuditRemove.xhtml
  */
 export async function superAuditRemoveMcp(

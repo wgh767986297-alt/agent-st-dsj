@@ -272,9 +272,18 @@ export const officerApi = {
 
   // ========== 下架审核流程 ==========
 
-  /** 申请下架数字警员（部门管理员） */
-  async applyRemove(id: number, delete_reason: string): Promise<void> {
-    await postApi('/dsjpt/jk/officer/applyRemove.xhtml', { id, delete_reason })
+  /** 申请下架数字警员 */
+  async applyRemove(id: number): Promise<void> {
+    await postApi('/dsjpt/jk/officer/applyRemove.xhtml', { id })
+  },
+
+  /** 部门管理员审核下架 dept_audit_status: '05'-通过 '06'-拒绝 */
+  async deptAuditRemove(
+    id: number,
+    dept_audit_status: '05' | '06',
+    dept_audit_remark?: string,
+  ): Promise<void> {
+    await postApi('/dsjpt/jk/officer/deptAuditRemove.xhtml', { id, dept_audit_status, dept_audit_remark })
   },
 
   /** 超级管理员审核下架（05-通过 06-拒绝） */

@@ -3,8 +3,25 @@
     <!-- Toast 通知 -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- 零信任自动登录加载态 -->
+    <div class="login-page" v-if="isZeroTrustLogin">
+      <main class="auth-container">
+        <div class="login-card">
+          <div class="card-bar"></div>
+          <div class="card-icon">
+            <img :src="iconLogo" alt="Logo" class="logo-mark-img" />
+          </div>
+          <div class="card-brand">苏小智</div>
+          <div class="card-welcome">正在验证身份，请稍候…</div>
+          <div class="zt-loading">
+            <div class="spin"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+
     <!-- 登录页 -->
-    <div class="login-page">
+    <div class="login-page" v-else>
       <main class="auth-container">
         <div class="login-card">
           <div class="card-bar"></div>
@@ -99,11 +116,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { View, Hide, User, Lock, CircleCheckFilled } from '@element-plus/icons-vue'
-import { authApi, decodeJwtPayload } from '@/api/auth'
+import { authApi, decodeJwtPayload, type LoginResult } from '@/api/auth'
 import { saveAuth } from '@/utils/auth'
 import { getClientIp } from '@/utils/clientIp'
 import iconLogo from '@/assets/icons/chat/icon-jh.png'
@@ -113,6 +130,8 @@ const route = useRoute()
 
 const loading = ref(false)
 const showPassword = ref(false)
+/** 零信任自动登录中时隐藏表单，避免闪烁 */
+const isZeroTrustLogin = ref(false)
 
 const formData = reactive({
   idCard: localStorage.getItem('login_id_card') || '',
@@ -129,12 +148,114 @@ const clearFieldError = (field: 'idCard' | 'password') => {
   errors[field] = ''
 }
 
+/** 登录成功后的公共处理：解码 JWT、保存认证信息、跳转 */
+const processLoginResult = async (loginResult: LoginResult, extra?: { ip?: string; idCard?: string }) => {
+  const { token } = loginResult
+  const tokenProfile = decodeJwtPayload(token)
+
+  const resolveRoleList = (source: any): string[] => {
+    if (Array.isArray(source?.role_list)) {
+      return source.role_list
+        .map((r: any) => r?.role_name || '')
+        .filter(Boolean)
+    }
+    return []
+  }
+  const resolvedRoleList =
+    resolveRoleList(loginResult).length > 0
+      ? resolveRoleList(loginResult)
+      : resolveRoleList(tokenProfile).length > 0
+        ? resolveRoleList(tokenProfile)
+        : resolveRoleList((loginResult as any).data)
+
+  const legacyRole =
+    loginResult.role ||
+    tokenProfile.role ||
+    (loginResult as any).data?.role ||
+    ''
+
+  const resolveDeptId = (source: Record<string, unknown> | null | undefined): unknown => {
+    if (!source) return undefined
+    return source.dept_id || source.deptId || source.departmentId || source.department_id || source.department
+  }
+  const deptId =
+    resolveDeptId(loginResult as any) ||
+    resolveDeptId((loginResult as any).user) ||
+    resolveDeptId((loginResult as any).profile) ||
+    resolveDeptId((loginResult as any).data) ||
+    resolveDeptId((loginResult as any).result) ||
+    tokenProfile.dept_id
+
+  const ip = extra?.ip
+
+  saveAuth(token, {
+    ...tokenProfile,
+    id: loginResult.id || tokenProfile.id,
+    name: loginResult.name || loginResult.realName || tokenProfile.name,
+    role: legacyRole,
+    role_list: resolvedRoleList.length > 0 ? resolvedRoleList : (legacyRole ? [legacyRole] : []),
+    ip:
+      loginResult.ip ||
+      loginResult.clientIp ||
+      loginResult.client_ip ||
+      loginResult.loginIp ||
+      loginResult.login_ip ||
+      loginResult.userIp ||
+      loginResult.user_ip ||
+      ip,
+    company: loginResult.company || loginResult.companyName || loginResult.unit,
+    department:
+      loginResult.departmentName ||
+      loginResult.deptName ||
+      tokenProfile.department ||
+      loginResult.department ||
+      loginResult.dept,
+    idCard:
+      loginResult.idCard ||
+      loginResult.id_card ||
+      loginResult.identityCard ||
+      loginResult.cardNo ||
+      tokenProfile.idCard ||
+      extra?.idCard,
+    dept_id: deptId ? Number(deptId) || undefined : tokenProfile.dept_id,
+  })
+
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+  await router.replace(redirect)
+}
+
+/** 零信任登录：URL 中携带 userToken / appToken 时自动登录 */
+const tryZeroTrustLogin = async () => {
+  const userToken = route.query.userToken as string | undefined
+  const appToken = route.query.appToken as string | undefined
+
+  if (!userToken || !appToken) return false
+
+  isZeroTrustLogin.value = true
+  loading.value = true
+
+  try {
+    const loginResult = await authApi.loginByZeroTrust(userToken, appToken)
+    await processLoginResult(loginResult)
+    return true
+  } catch (error) {
+    isZeroTrustLogin.value = false
+    ElMessage.error(error instanceof Error ? error.message : '零信任登录失败')
+    // 清除 URL 中的 token 参数，避免刷新页面时重复触发
+    const cleaned = { ...route.query }
+    delete cleaned.userToken
+    delete cleaned.appToken
+    router.replace({ query: cleaned }).catch(() => {})
+    return false
+  } finally {
+    loading.value = false
+  }
+}
+
 const handleSubmit = async () => {
-  // 清除之前的错误
   errors.idCard = ''
   errors.password = ''
 
-  // 验证
   if (!formData.idCard.trim()) {
     errors.idCard = '请输入账号'
     return
@@ -153,90 +274,23 @@ const handleSubmit = async () => {
       password: formData.password,
       ip,
     })
-    const { token } = loginResult
-    const tokenProfile = decodeJwtPayload(token)
-
-    // 角色来源：loginResult.role_list[].role_name > JWT role_list > 单 role 字段
-    const resolveRoleList = (source: any): string[] => {
-      if (Array.isArray(source?.role_list)) {
-        return source.role_list
-          .map((r: any) => r?.role_name || '')
-          .filter(Boolean)
-      }
-      return []
-    }
-    const resolvedRoleList =
-      resolveRoleList(loginResult).length > 0
-        ? resolveRoleList(loginResult)
-        : resolveRoleList(tokenProfile).length > 0
-          ? resolveRoleList(tokenProfile)
-          : resolveRoleList((loginResult as any).data)
-
-    // 兼容旧版单 role 字段
-    const legacyRole =
-      loginResult.role ||
-      tokenProfile.role ||
-      (loginResult as any).data?.role ||
-      ''
-
-    // dept_id 来源：loginResult 顶层 > 嵌套对象 > JWT token profile > data
-    const resolveDeptId = (source: Record<string, unknown> | null | undefined): unknown => {
-      if (!source) return undefined
-      return source.dept_id || source.deptId || source.departmentId || source.department_id || source.department
-    }
-    const deptId =
-      resolveDeptId(loginResult as any) ||
-      resolveDeptId((loginResult as any).user) ||
-      resolveDeptId((loginResult as any).profile) ||
-      resolveDeptId((loginResult as any).data) ||
-      resolveDeptId((loginResult as any).result) ||
-      tokenProfile.dept_id
-
-    saveAuth(token, {
-      ...tokenProfile,
-      id: loginResult.id || tokenProfile.id,
-      name: loginResult.name || loginResult.realName || tokenProfile.name,
-      role: legacyRole,
-      role_list: resolvedRoleList.length > 0 ? resolvedRoleList : (legacyRole ? [legacyRole] : []),
-      ip:
-        loginResult.ip ||
-        loginResult.clientIp ||
-        loginResult.client_ip ||
-        loginResult.loginIp ||
-        loginResult.login_ip ||
-        loginResult.userIp ||
-        loginResult.user_ip ||
-        ip,
-      company: loginResult.company || loginResult.companyName || loginResult.unit,
-      department:
-        loginResult.departmentName ||
-        loginResult.deptName ||
-        tokenProfile.department ||
-        loginResult.department ||
-        loginResult.dept,
-      idCard:
-        loginResult.idCard ||
-        loginResult.id_card ||
-        loginResult.identityCard ||
-        loginResult.cardNo ||
-        tokenProfile.idCard ||
-        formData.idCard,
-      dept_id: deptId ? Number(deptId) || undefined : tokenProfile.dept_id,
-    })
+    await processLoginResult(loginResult, { ip, idCard: formData.idCard })
 
     if (formData.remember) {
       localStorage.setItem('login_id_card', formData.idCard)
     } else {
       localStorage.removeItem('login_id_card')
     }
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    await router.replace(redirect)
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '登录失败')
   } finally {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  tryZeroTrustLogin()
+})
 
 </script>
 
@@ -697,6 +751,22 @@ const handleSubmit = async () => {
   to {
     stroke-dashoffset: 0;
   }
+}
+
+/* ===== 零信任加载态 ===== */
+.zt-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.zt-loading .spin {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(14, 138, 125, 0.18);
+  border-top-color: var(--lp-accent);
+  border-radius: 50%;
+  animation: spinner 0.55s linear infinite;
 }
 
 /* ===== 响应式 ===== */

@@ -39,17 +39,17 @@
           </button>
         </div>
         <div class="ds-toolbar">
-          <SearchInput
-            v-model="searchQuery"
-            placeholder="搜索我的数字警员..."
-            @search="handleSearch"
-          />
           <el-select v-model="currentFilter" style="width: 140px">
             <el-option label="全部状态" value="all" />
             <el-option label="已上架" value="public" />
             <el-option label="待审核" value="pending" />
             <el-option label="已下架" value="offline" />
           </el-select>
+          <SearchInput
+            v-model="searchQuery"
+            placeholder="搜索我的数字警员..."
+            @search="handleSearch"
+          />
         </div>
 
         <!-- Loading -->
@@ -154,13 +154,6 @@
                 申请下架
               </button>
               <button
-                v-if="isManager && getStatus(officer) === AuditStatus.PUBLISHED"
-                class="ds-btn-mini-danger"
-                @click="handleSetPublic(officer, false)"
-              >
-                下架
-              </button>
-              <button
                 v-if="getButtonVisibility(officer).showDelete"
                 class="ds-btn-mini-danger"
                 @click="handleDeleteOfficer(officer)"
@@ -180,15 +173,15 @@
           </h3>
         </div>
         <div class="ds-toolbar">
+          <el-select v-model="generalFilter" style="width: 140px">
+            <el-option label="全部状态" value="all" />
+            <el-option label="已上架" value="public" />
+          </el-select>
           <SearchInput
             v-model="generalSearchQuery"
             placeholder="搜索通用数字警员..."
             @search="handleGeneralSearch"
           />
-          <el-select v-model="generalFilter" style="width: 140px">
-            <el-option label="全部状态" value="all" />
-            <el-option label="已上架" value="public" />
-          </el-select>
         </div>
 
         <!-- Loading -->
@@ -793,8 +786,7 @@ function hasAnyAction(officer: OfficerItem & { _source?: string }): boolean {
     vis.showEdit ||
     vis.showPublish ||
     vis.showUnpublish ||
-    vis.showDelete ||
-    (isManager.value && getStatus(officer) === AuditStatus.PUBLISHED)
+    vis.showDelete
   )
 }
 
@@ -1057,25 +1049,8 @@ async function handleApplyUnpublishOfficer(officer: OfficerItem) {
       '申请下架',
       { confirmButtonText: '确认申请', cancelButtonText: '取消', type: 'warning' },
     )
-    await officerApi.applyRemove(officer.id, '用户申请下架')
+    await officerApi.applyRemove(officer.id)
     ElMessage.success('下架申请已提交，请等待审核')
-    await refreshList()
-  } catch {
-    // cancelled
-  }
-}
-
-/** 管理员直接上架/下架 */
-async function handleSetPublic(officer: OfficerItem, isPublic: boolean) {
-  const action = isPublic ? '上架' : '下架'
-  try {
-    await ElMessageBox.confirm(
-      `确定要${action}警员「${officer.officer_name}」吗？`,
-      `确认${action}`,
-      { confirmButtonText: `确认${action}`, cancelButtonText: '取消', type: 'warning' },
-    )
-    await officerApi.setPublic(officer.id, isPublic)
-    ElMessage.success(`${action}成功`)
     await refreshList()
   } catch {
     // cancelled
@@ -1254,11 +1229,13 @@ async function doGeneralAuth() {
   }
   generalAuthGranting.value = true
   try {
+    const selectedUser = generalAuthUsers.value.find(u => Number(u.id) === generalAuthUserId.value)
     await authManageApi.grant({
       auth_target_type: 'user',
       user_id: generalAuthUserId.value,
       resource_type: 'officer',
       resource_id: generalAuthTarget.value.resource_id,
+      dept_id: selectedUser?.dept_id,
     })
     ElMessage.success('授权成功')
     generalAuthDialogVisible.value = false

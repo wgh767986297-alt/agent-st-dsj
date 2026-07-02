@@ -1,5 +1,6 @@
 <template>
   <div class="skill-audit-page" :class="{ 'skill-audit-page--embedded': embedded }">
+    <div class="ds-page-container">
     <header class="skill-audit-header">
       <div class="skill-audit-title-row">
         <span class="skill-audit-title-icon"><el-icon :size="22"><MagicStick /></el-icon></span>
@@ -99,6 +100,11 @@
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--approve" size="small" text @click="handleDeptAuditDelete(row, '02')">通过删除</el-button>
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--reject" size="small" text @click="handleDeptAuditDelete(row, '03')">拒绝删除</el-button>
                 </template>
+                <!-- 部门审核下架 -->
+                <template v-if="row.dept_audit_status === '04'">
+                  <el-button class="skill-audit-action-btn skill-audit-action-btn--approve" size="small" text @click="handleDeptAuditRemove(row, '05')">通过下架</el-button>
+                  <el-button class="skill-audit-action-btn skill-audit-action-btn--reject" size="small" text @click="handleDeptAuditRemove(row, '06')">拒绝下架</el-button>
+                </template>
                 <!-- 已上架 → 部门管理员可申请下架 -->
                 <template v-if="row.is_public && !row.dept_delete_audit_status">
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--remove" size="small" text @click="handleApplyRemove(row)">申请下架</el-button>
@@ -122,8 +128,8 @@
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--approve" size="small" text @click="handleSuperAuditDelete(row, '02')">通过删除</el-button>
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--reject" size="small" text @click="handleSuperAuditDelete(row, '03')">拒绝删除</el-button>
                 </template>
-                <!-- 超管审核下架（部门已申请下架） -->
-                <template v-if="row.super_delete_audit_status === '00' && row.dept_delete_audit_status === '00' && row.delete_reason">
+                <!-- 超管审核下架（部门管理员已审核通过下架） -->
+                <template v-if="row.dept_audit_status === '05' && row.super_delete_audit_status === '00'">
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--approve" size="small" text @click="handleSuperAuditRemove(row, '05')">通过下架</el-button>
                   <el-button class="skill-audit-action-btn skill-audit-action-btn--reject" size="small" text @click="handleSuperAuditRemove(row, '06')">拒绝下架</el-button>
                 </template>
@@ -165,17 +171,13 @@
         <div class="audit-confirm__info">
           <span>技能：</span><strong>{{ removeTarget.skill_name }}</strong>
         </div>
-        <el-form label-position="top" style="margin-top:12px">
-          <el-form-item label="下架原因" required>
-            <el-input v-model="removeReason" type="textarea" :rows="3" placeholder="请输入下架原因（必填）" />
-          </el-form-item>
-        </el-form>
       </div>
       <template #footer>
         <el-button @click="removeDialogVisible = false">取消</el-button>
-        <el-button type="warning" :loading="removing" @click="confirmApplyRemove" :disabled="!removeReason.trim()">确认申请下架</el-button>
+        <el-button type="warning" :loading="removing" @click="confirmApplyRemove">确认申请下架</el-button>
       </template>
     </el-dialog>
+    </div>
   </div>
 </template>
 
@@ -270,13 +272,14 @@ function hasActionFor(row: SkillItem): boolean {
   if (isDeptAdmin.value) {
     if (row.dept_audit_status === '00') return true
     if (row.dept_delete_audit_status === '00') return true
+    if (row.dept_audit_status === '04') return true
     if (row.is_public && !row.dept_delete_audit_status) return true
   }
   if (isSuperAdmin.value) {
     if (row.dept_audit_status === '02' && row.super_audit_status === '00') return true
     if (row.dept_audit_status === '02' && row.super_audit_status === '02') return true
     if (row.dept_delete_audit_status === '02' && row.super_delete_audit_status === '00') return true
-    if (row.super_delete_audit_status === '00' && row.dept_delete_audit_status === '00' && row.delete_reason) return true
+    if (row.dept_audit_status === '05' && row.super_delete_audit_status === '00') return true
   }
   return false
 }
@@ -285,24 +288,26 @@ function hasActionFor(row: SkillItem): boolean {
 const auditDialogVisible = ref(false)
 const auditTarget = ref<SkillItem | null>(null)
 // 审核类型: dept | super | setPublic | deptDelete | superDelete | superRemove
-const auditActionType = ref<'dept' | 'super' | 'setPublic' | 'deptDelete' | 'superDelete' | 'superRemove'>('dept')
+const auditActionType = ref<'dept' | 'super' | 'setPublic' | 'deptDelete' | 'superDelete' | 'deptRemove' | 'superRemove'>('dept')
 const auditActionValue = ref('')
 const auditRemark = ref('')
 const auditing = ref(false)
 
 const auditDialogTitle = computed(() => {
   if (auditActionType.value === 'deptDelete') return '部门审核删除'
+  if (auditActionType.value === 'deptRemove') return '部门审核下架'
   if (auditActionType.value === 'superDelete') return '超管审核删除'
   if (auditActionType.value === 'superRemove') return '超管审核下架'
   return '审核确认'
 })
 
 const auditActionLabel = computed(() => {
-  const isApprove = auditActionValue.value === '02' || auditActionValue.value === 'true'
+  const isApprove = auditActionValue.value === '02' || auditActionValue.value === '05' || auditActionValue.value === 'true'
   if (auditActionType.value === 'dept') return isApprove ? '部门审核通过' : '部门审核拒绝'
   if (auditActionType.value === 'super') return isApprove ? '超管审核通过' : '超管审核拒绝'
   if (auditActionType.value === 'setPublic') return auditActionValue.value === 'true' ? '上架' : '下架'
   if (auditActionType.value === 'deptDelete') return isApprove ? '通过删除' : '拒绝删除'
+  if (auditActionType.value === 'deptRemove') return isApprove ? '通过下架' : '拒绝下架'
   if (auditActionType.value === 'superDelete') return isApprove ? '通过删除' : '拒绝删除'
   if (auditActionType.value === 'superRemove') return isApprove ? '通过下架' : '拒绝下架'
   return ''
@@ -330,6 +335,10 @@ function handleSetPublic(row: SkillItem, isPublic: boolean) {
 function handleDeptAuditDelete(row: SkillItem, status: '02' | '03') {
   auditTarget.value = row; auditActionType.value = 'deptDelete'; auditActionValue.value = status; auditRemark.value = ''; auditDialogVisible.value = true
 }
+// ---- 部门审核下架 ----
+function handleDeptAuditRemove(row: SkillItem, status: '05' | '06') {
+  auditTarget.value = row; auditActionType.value = 'deptRemove'; auditActionValue.value = status; auditRemark.value = ''; auditDialogVisible.value = true
+}
 // ---- 超管审核删除 ----
 function handleSuperAuditDelete(row: SkillItem, status: '02' | '03') {
   auditTarget.value = row; auditActionType.value = 'superDelete'; auditActionValue.value = status; auditRemark.value = ''; auditDialogVisible.value = true
@@ -344,7 +353,6 @@ async function confirmAudit() {
   auditing.value = true
   try {
     const id = auditTarget.value.id
-    const isRemove = auditActionType.value === 'superRemove'
     // 上架: '02'通过/'03'拒绝, 下架: '05'通过/'06'拒绝
     const status = auditActionValue.value as string
     switch (auditActionType.value) {
@@ -359,6 +367,9 @@ async function confirmAudit() {
         break
       case 'deptDelete':
         await skillManageApi.deptAuditDelete(id, status as '02' | '03', auditRemark.value || undefined)
+        break
+      case 'deptRemove':
+        await skillManageApi.deptAuditRemove(id, status as '05' | '06', auditRemark.value || undefined)
         break
       case 'superDelete':
         await skillManageApi.superAuditDelete(id, status as '02' | '03', auditRemark.value || undefined)
@@ -380,18 +391,17 @@ async function confirmAudit() {
 // ============ 申请下架 ============
 const removeDialogVisible = ref(false)
 const removeTarget = ref<SkillItem | null>(null)
-const removeReason = ref('')
 const removing = ref(false)
 
 function handleApplyRemove(row: SkillItem) {
-  removeTarget.value = row; removeReason.value = ''; removeDialogVisible.value = true
+  removeTarget.value = row; removeDialogVisible.value = true
 }
 
 async function confirmApplyRemove() {
-  if (!removeTarget.value || !removeReason.value.trim()) return
+  if (!removeTarget.value) return
   removing.value = true
   try {
-    await skillManageApi.applyRemove(removeTarget.value.id, removeReason.value.trim())
+    await skillManageApi.applyRemove(removeTarget.value.id)
     ElMessage.success('下架申请已提交，等待超级管理员审核')
     removeDialogVisible.value = false
     await loadList()
@@ -425,6 +435,7 @@ onMounted(() => loadList())
 
 <style scoped>
 .skill-audit-page { display: flex; flex-direction: column; height: 100%; padding: 0; background: var(--app-bg); color: var(--app-text); }
+.skill-audit-page > .ds-page-container { display: flex; flex-direction: column; height: 100%; }
 .skill-audit-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; flex-shrink: 0; }
 .skill-audit-title-row { display: flex; align-items: center; gap: 14px; }
 .skill-audit-title-icon {

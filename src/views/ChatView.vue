@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -34,11 +34,14 @@ import AppendixHistoryPanel from '@/components/chat/AppendixHistoryPanel.vue'
 import SensitiveWordDialog from '@/components/chat/SensitiveWordDialog.vue'
 import SkillsMarketView from '@/views/SkillsMarketView.vue'
 import McpManagementView from '@/views/McpManagementView.vue'
-import { listEnabledMcpServices, type McpServiceItem } from '@/api/mcpService'
+import { type McpServiceItem } from '@/api/mcpService'
 import { officerApi, type OfficerItem } from '@/api/officer'
+import { getMyResources } from '@/api/resource'
 import { useScrollManager } from '@/composables/useScrollManager'
 import { useLongPress } from '@/composables/useLongPress'
 import { isAdminAccount } from '@/utils/auth'
+
+defineOptions({ name: 'ChatView' })
 
 import arrowBottomIcon from '@/assets/icons/chat/icon-chat-arrow-bottom.png'
 import iconNavOpen from '@/assets/icons/nav/icon-nav-open.png'
@@ -160,7 +163,8 @@ const loadMcpList = async () => {
   if (mcpList.value.length > 0 || mcpListLoading.value) return
   mcpListLoading.value = true
   try {
-    mcpList.value = await listEnabledMcpServices(200)
+    const data = await getMyResources('mcp')
+    mcpList.value = data.list.mcps
   } catch {
     // 静默失败，MCP 选择器显示为空
   } finally {
@@ -189,7 +193,8 @@ const loadOfficerList = async () => {
   if (officerList.value.length > 0 || officerListLoading.value) return
   officerListLoading.value = true
   try {
-    officerList.value = await officerApi.list()
+    const data = await getMyResources('officer')
+    officerList.value = data.list.officers
   } catch {
     officerList.value = []
   } finally {
@@ -671,7 +676,7 @@ const sendCurrentMessage = async () => {
         const result = officerResources[i]
         const resources = (result?.status === 'fulfilled' ? result.value : []) as any[]
         const skills = resources
-          .filter((r: any) => r.resource_type === 'skill')
+          .filter((r: any) => String(r.resource_type || '').toLowerCase() === 'skill')
           .map((r: any) => ({ id: r.resource_id, name: r.resource_name || '' }))
         officersForMessage.push({
           id: o.id,
@@ -680,9 +685,10 @@ const sendCurrentMessage = async () => {
         })
         // 从警员资源中收集 skill_key 和 mcp_identifiers
         resources.forEach((r: any) => {
-          if (r.resource_type === 'skill') {
+          const resourceType = String(r.resource_type || '').toLowerCase()
+          if (resourceType === 'skill') {
             skillKeys.push(String(r.resource_id))
-          } else if (r.resource_type === 'mcp') {
+          } else if (resourceType === 'mcp') {
             mcpIdentifiers.push(String(r.resource_id))
           }
         })
@@ -1099,6 +1105,32 @@ onUnmounted(() => {
   if (chatStore.messages.length > 0 && chatStore.currentHistoryId) {
     chatStore.autoSaveConversation().catch((err: any) => {})
   }
+})
+
+// keep-alive 缓存时：清理定时器 + 移除 resize 监听，避免后台空转
+onDeactivated(() => {
+  if (skillSearchTimer !== null) {
+    window.clearTimeout(skillSearchTimer)
+    skillSearchTimer = null
+  }
+  if (stopIconTimer !== null) {
+    clearTimeout(stopIconTimer)
+    stopIconTimer = null
+  }
+  if (welcomeTypingTimer !== null) {
+    window.clearTimeout(welcomeTypingTimer)
+    welcomeTypingTimer = null
+  }
+  window.removeEventListener('resize', handleResize)
+})
+
+// keep-alive 恢复时：重新挂载 resize 监听，刷新滚动状态
+onActivated(() => {
+  window.addEventListener('resize', handleResize)
+  nextTick(() => {
+    requestAnimationFrame(updateChatScrollState)
+    requestAnimationFrame(updateActiveMessageFromScroll)
+  })
 })
 </script>
 

@@ -14,14 +14,14 @@
       <button
         class="ds-section-tab"
         :class="{ active: activeTab === 'mine' }"
-        @click="activeTab = 'mine'; currentPage = 1"
+        @click="activeTab = 'mine'"
       >
         我的MCP服务<span class="count">({{ mineTotal }})</span>
       </button>
       <button
         class="ds-section-tab"
         :class="{ active: activeTab === 'general' }"
-        @click="activeTab = 'general'; currentPage = 1"
+        @click="activeTab = 'general'"
       >
         通用MCP服务<span class="count">({{ generalTotal }})</span>
       </button>
@@ -40,11 +40,6 @@
         </button>
       </div>
       <div class="ds-toolbar">
-        <SearchInput
-          v-model="searchQuery"
-          placeholder="搜索我的MCP服务..."
-          @search="handleSearch"
-        />
         <el-select v-model="currentCategory" style="width: 140px" clearable placeholder="全部分类" @change="handleSearch">
           <el-option
             v-for="cat in categoryOptions"
@@ -53,10 +48,11 @@
             :value="cat.value"
           />
         </el-select>
-        <button class="ds-btn-outline" @click="refreshList" :disabled="loading">
-          <el-icon :size="14"><Refresh /></el-icon>
-          刷新
-        </button>
+        <SearchInput
+          v-model="searchQuery"
+          placeholder="搜索我的MCP服务..."
+          @search="handleSearch"
+        />
       </div>
 
       <!-- 加载状态 -->
@@ -139,11 +135,6 @@
         </h3>
       </div>
       <div class="ds-toolbar">
-        <SearchInput
-          v-model="searchQuery"
-          placeholder="搜索通用MCP服务..."
-          @search="handleSearch"
-        />
         <el-select v-model="currentCategory" style="width: 140px" clearable placeholder="全部分类" @change="handleSearch">
           <el-option
             v-for="cat in categoryOptions"
@@ -152,10 +143,11 @@
             :value="cat.value"
           />
         </el-select>
-        <button class="ds-btn-outline" @click="refreshList" :disabled="loading">
-          <el-icon :size="14"><Refresh /></el-icon>
-          刷新
-        </button>
+        <SearchInput
+          v-model="searchQuery"
+          placeholder="搜索通用MCP服务..."
+          @search="handleSearch"
+        />
       </div>
 
       <!-- 加载状态 -->
@@ -217,25 +209,6 @@
           {{ searchQuery || currentCategory ? '没有找到匹配的 MCP 服务' : '暂无已上架的通用 MCP 服务' }}
         </p>
       </div>
-    </div>
-
-    <!-- ==================== 分页 ==================== -->
-    <div
-      v-if="!loading && !loadError"
-      style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid var(--ds-border);flex-wrap:wrap;gap:12px;"
-    >
-      <span style="font-size:13px;color:var(--ds-text-secondary);">
-        共 <strong style="color:var(--ds-text);">{{ currentTabTotal }}</strong> 条
-      </span>
-      <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="pageSize"
-        :total="currentTabTotal"
-        layout="prev, pager, next"
-        background
-        small
-        @current-change="goPage"
-      />
     </div>
 
     <!-- ==================== 创建/编辑对话框 ==================== -->
@@ -542,7 +515,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Refresh,
   Plus,
   Edit,
   Delete,
@@ -595,9 +567,6 @@ const loadError = ref('')
 // ============ 搜索 & 筛选 ============
 const searchQuery = ref('')
 const currentCategory = ref('')
-const currentPage = ref(1)
-const pageSize = 6
-
 // ============ 分类定义 ============
 const categoryMap: Record<string, string> = {
   QUERY: '数据查询',
@@ -652,15 +621,7 @@ function isOwner(item: McpServiceItem & { _source?: string } | null): boolean {
 
 // ============ 当前 Tab 显示数据 ============
 const mineItems = computed(() => mineData.value)
-const generalItems = computed(() => {
-  // API 返回扁平数组不支持服务端分页，客户端切片
-  const start = (currentPage.value - 1) * pageSize
-  return generalData.value.slice(start, start + pageSize)
-})
-
-const currentTabTotal = computed(() => {
-  return activeTab.value === 'mine' ? mineTotal.value : generalTotal.value
-})
+const generalItems = computed(() => generalData.value)
 
 // ============ API 方法 ============
 async function loadData(tab?: 'mine' | 'general' | 'both') {
@@ -698,8 +659,6 @@ async function loadData(tab?: 'mine' | 'general' | 'both') {
       const params: Record<string, unknown> = {
         resource_type: 'mcp',
         is_public: true,
-        page: t === 'general' ? currentPage.value : 1,
-        limit: t === 'general' ? pageSize : 200,
       }
       // 通用接口不支持 category 筛选，客户端过滤
       const data = await getPublicResources(params as import('@/api/resource').PublicResourceParams)
@@ -722,22 +681,12 @@ async function loadData(tab?: 'mine' | 'general' | 'both') {
 
 // ============ 事件处理 ============
 const handleSearch = () => {
-  currentPage.value = 1
   loadData()
-}
-
-const goPage = (page: number) => {
-  currentPage.value = page
-  // general tab 使用客户端分页，无需重新请求 API
-  if (activeTab.value === 'mine') {
-    loadData()
-  }
 }
 
 const refreshList = () => {
   searchQuery.value = ''
   currentCategory.value = ''
-  currentPage.value = 1
   loadData()
 }
 
@@ -762,7 +711,7 @@ async function applyUnpublishMCP(item: McpServiceItem) {
         type: 'warning',
       },
     )
-    await applyRemoveMcp(item.id, '用户申请下架')
+    await applyRemoveMcp(item.id)
     ElMessage.success(`已提交下架申请「${item.service_name}」`)
     await loadData()
   } catch (e) {
@@ -913,7 +862,6 @@ function openDetail(item: McpServiceItem) {
 
 // Tab 切换时重置状态（数据已在 onMounted 预加载）
 watch(activeTab, () => {
-  currentPage.value = 1
   searchQuery.value = ''
   currentCategory.value = ''
 })
@@ -982,11 +930,13 @@ async function doGeneralMcpAuth() {
   }
   generalMcpAuthGranting.value = true
   try {
+    const selectedUser = generalMcpAuthUsers.value.find(u => Number(u.id) === generalMcpAuthUserId.value)
     await authManageApi.grant({
       auth_target_type: 'user',
       user_id: generalMcpAuthUserId.value,
       resource_type: 'mcp',
       resource_id: generalMcpAuthTarget.value.resource_id,
+      dept_id: selectedUser?.dept_id,
     })
     ElMessage.success('授权成功')
     generalMcpAuthDialogVisible.value = false

@@ -16,7 +16,11 @@ const hideNavbar = computed(() => ['/login'].includes(route.path))
   <div class="app-root">
     <TopNavbar v-if="!hideNavbar" @open-settings="settingsVisible = true" />
     <main class="app-main" :class="{ 'app-main--no-navbar': hideNavbar }">
-      <RouterView />
+      <RouterView v-slot="{ Component }">
+        <keep-alive :include="['ChatView']">
+          <component :is="Component" />
+        </keep-alive>
+      </RouterView>
     </main>
     <!-- 水印 -->
     <!-- <GlobalWatermark /> -->

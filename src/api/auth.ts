@@ -236,6 +236,35 @@ export const authApi = {
     await postJson('/dsjpt/jk/register.xhtml', payload)
   },
 
+  /** 零信任登录（第三方平台映射），token 通过请求头传递 */
+  async loginByZeroTrust(userToken: string, appToken: string): Promise<LoginResult> {
+    const response = await postJson<LoginResult, Partial<LoginResult>>(
+      '/zero-trust/login.xhtml',
+      {},
+      {
+        'RZZX-USERTOKEN': userToken,
+        'RZZX-APPTOKEN': appToken,
+      },
+    )
+
+    const token =
+      ((response.data as Record<string, unknown> | undefined)?.token as string | undefined) ||
+      response.result?.token
+
+    if (!token) {
+      throw new Error(response.message || '登录成功但未返回 token')
+    }
+
+    const nestedProfile = response.result?.user || response.result?.profile
+
+    return {
+      ...response.data,
+      ...response.result,
+      ...nestedProfile,
+      token,
+    }
+  },
+
   async changePassword(payload: ChangePasswordPayload): Promise<void> {
     const token = getAuthToken()
 

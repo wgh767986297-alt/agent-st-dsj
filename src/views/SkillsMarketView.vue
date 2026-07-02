@@ -39,11 +39,6 @@
           </button>
         </div>
         <div class="ds-toolbar">
-          <SearchInput
-            v-model="mineSearchKeyword"
-            placeholder="搜索我的技能..."
-            @search="currentPage = 1"
-          />
           <el-select v-model="mineCategory" style="width: 140px" clearable placeholder="全部分类" @change="currentPage = 1">
             <el-option
               v-for="cat in apiCategories"
@@ -52,6 +47,11 @@
               :value="cat.value"
             />
           </el-select>
+          <SearchInput
+            v-model="mineSearchKeyword"
+            placeholder="搜索我的技能..."
+            @search="currentPage = 1"
+          />
         </div>
 
         <!-- 加载状态 -->
@@ -119,11 +119,6 @@
           </h3>
         </div>
         <div class="ds-toolbar">
-          <SearchInput
-            v-model="generalSearchKeyword"
-            placeholder="搜索通用技能..."
-            @search="currentPage = 1"
-          />
           <el-select v-model="generalCategory" style="width: 140px" clearable placeholder="全部分类" @change="currentPage = 1">
             <el-option
               v-for="cat in apiCategories"
@@ -132,6 +127,11 @@
               :value="cat.value"
             />
           </el-select>
+          <SearchInput
+            v-model="generalSearchKeyword"
+            placeholder="搜索通用技能..."
+            @search="currentPage = 1"
+          />
         </div>
 
         <!-- 加载状态 -->
@@ -675,7 +675,7 @@ const unpublishSkill = async (skill: SkillItem) => {
       '下架确认',
       { confirmButtonText: '确认下架', cancelButtonText: '取消', type: 'warning' },
     )
-    await skillManageApi.applyRemove(skill.originalId, '用户申请下架')
+    await skillManageApi.applyRemove(skill.originalId)
     ElMessage.success(`已提交下架申请「${skill.title}」`)
     fullSkillItems.value = []
     fullSkillListLoaded.value = false
@@ -761,11 +761,13 @@ async function doGeneralSkillAuth() {
   }
   generalSkillAuthGranting.value = true
   try {
+    const selectedUser = generalSkillAuthUsers.value.find(u => Number(u.id) === generalSkillAuthUserId.value)
     await authManageApi.grant({
       auth_target_type: 'user',
       user_id: generalSkillAuthUserId.value,
       resource_type: 'skill',
       resource_id: generalSkillAuthTarget.value.originalId,
+      dept_id: selectedUser?.dept_id,
     })
     ElMessage.success('授权成功')
     generalSkillAuthDialogVisible.value = false

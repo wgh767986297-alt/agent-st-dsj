@@ -224,9 +224,18 @@ export const skillManageApi = {
 
   // ========== 下架审核流程 ==========
 
-  /** 申请下架技能（部门管理员） */
-  async applyRemove(id: number, delete_reason: string): Promise<void> {
-    await postApi('/dsjpt/jk/skill/applyRemove.xhtml', { id, delete_reason })
+  /** 申请下架技能 */
+  async applyRemove(id: number): Promise<void> {
+    await postApi('/dsjpt/jk/skill/applyRemove.xhtml', { id })
+  },
+
+  /** 部门管理员审核下架 dept_audit_status: '05'-通过 '06'-拒绝 */
+  async deptAuditRemove(
+    id: number,
+    dept_audit_status: '05' | '06',
+    dept_audit_remark?: string,
+  ): Promise<void> {
+    await postApi('/dsjpt/jk/skill/deptAuditRemove.xhtml', { id, dept_audit_status, dept_audit_remark })
   },
 
   /** 超级管理员审核下架（05-通过 06-拒绝） */

@@ -397,7 +397,7 @@ onMounted(() => {
             </thead>
             <tbody>
               <tr v-for="item in resourcesList" :key="`${item.resource_type}-${item.resource_id}`">
-                <td>
+                <td style="white-space: nowrap">
                   <span class="ds-perm-chip" :class="`ds-perm-chip--${item.resource_type}`">
                     {{ resourceTypeLabel(item.resource_type) }}
                   </span>
@@ -409,7 +409,7 @@ onMounted(() => {
                     {{ item.description || '—' }}
                   </span>
                 </td>
-                <td>
+                <td style="white-space: nowrap">
                   <span :class="getStatus(item) === '02' ? 'ds-tag-approved' : getStatus(item) === '01' || getStatus(item) === '04' ? 'ds-tag-pending' : 'ds-tag-rejected'">
                     {{ resourceStatusLabel(item) }}
                   </span>
