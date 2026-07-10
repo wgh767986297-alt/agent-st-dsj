@@ -16,21 +16,22 @@
  *
  * 判断优先级（从上到下依次匹配，命中即停止）：
  *   1. _source 判断 — 非当前用户创建 → 隐藏所有操作按钮（在各视图层处理）
- *   2. super + dept 均为 '00' 或 任一为 '03' → 00/03 状态
- *   3. super 或 dept 任一为 '01' 或 '04' → 01/04 状态（审核中）
- *   4. super === '02' → 已上架
- *   5. super === '05' → 已下架
- *   6. super 或 dept 任一为 '06' → 下架被驳回
+ *   2. super + dept 均为 '00' 或 任一为 '03' → 00/03 状态（可操作）
+ *   3. super 或 dept 任一为 '06' → 06 状态（下架被驳回，可重新申请下架）
+ *      ↑ 必须在规则4之前，否则 '01'/'04'/'02'/'05' 会抢先匹配
+ *   4. super 或 dept 任一为 '01' 或 '04' → 01/04 状态（审核中，全部隐藏）
+ *   5. super === '02' → 已上架（仅申请下架）
+ *   6. super === '05' → 已下架（可重新上架）
  */
 
 export const AuditStatus = {
-  SILENT: '00',              // 静默状态（可申请上架）
-  PUBLISH_PENDING: '01',     // 申请上架审核中
-  PUBLISHED: '02',           // 申请上架成功（已上架）
-  PUBLISH_REJECTED: '03',    // 申请上架驳回
-  UNPUBLISH_PENDING: '04',   // 申请下架审核中
-  UNPUBLISHED: '05',         // 申请下架成功（已下架）
-  UNPUBLISH_REJECTED: '06',  // 申请下架驳回
+  SILENT: '00', // 静默状态（可申请上架）
+  PUBLISH_PENDING: '01', // 申请上架审核中
+  PUBLISHED: '02', // 申请上架成功（已上架）
+  PUBLISH_REJECTED: '03', // 申请上架驳回
+  UNPUBLISH_PENDING: '04', // 申请下架审核中
+  UNPUBLISHED: '05', // 申请下架成功（已下架）
+  UNPUBLISH_REJECTED: '06', // 申请下架驳回
 } as const
 
 export type AuditStatusCode = (typeof AuditStatus)[keyof typeof AuditStatus]
@@ -43,18 +44,18 @@ export const AuditStatusLabel: Record<string, string> = {
   '03': '上架被驳回',
   '04': '下架审核中',
   '05': '已下架',
-  '06': '下架被驳回',
+  '06': '已上架',
 }
 
 /** 状态码 → CSS class */
 export const AuditStatusClass: Record<string, string> = {
-  '00': 'ds-tag-approved',   // 静默 → 正常
-  '01': 'ds-tag-pending',    // 上架审核中
-  '02': 'ds-tag-approved',   // 已上架
-  '03': 'ds-tag-rejected',   // 上架驳回
-  '04': 'ds-tag-pending',    // 下架审核中
-  '05': 'ds-tag-approved',   // 已下架（正常终态）
-  '06': 'ds-tag-rejected',   // 下架驳回
+  '00': 'ds-tag-approved', // 静默 → 正常
+  '01': 'ds-tag-pending', // 上架审核中
+  '02': 'ds-tag-approved', // 已上架
+  '03': 'ds-tag-rejected', // 上架驳回
+  '04': 'ds-tag-pending', // 下架审核中
+  '05': 'ds-tag-approved', // 已下架（正常终态）
+  '06': 'ds-tag-approved', // 下架驳回
 }
 
 // ========== 类型归一化 ==========
@@ -94,7 +95,7 @@ export interface ButtonVisibility {
  *   03 上架被驳回     → 申请上架 + 编辑 + 删除（修改后可重新申请）
  *   04 下架审核中     → 全部隐藏（等待审核结果）
  *   05 已下架         → 申请上架 + 编辑 + 删除（可重新上架或清理）
- *   06 下架被驳回     → 全部隐藏（驳回后不允许操作，需联系管理员）
+ *   06 下架被驳回     → 申请下架（驳回后可重新申请下架）
  */
 export function getButtonVisibility(item: {
   is_public?: unknown
@@ -107,20 +108,20 @@ export function getButtonVisibility(item: {
   const status = getStatus(item)
 
   switch (status) {
-    case AuditStatus.SILENT:            // 00 静默 → 可申请上架 + 编辑 + 删除
+    case AuditStatus.SILENT: // 00 静默 → 可申请上架 + 编辑 + 删除
       return { showPublish: true, showUnpublish: false, showEdit: true, showDelete: true }
-    case AuditStatus.PUBLISH_PENDING:   // 01 上架审核中 → 全部隐藏
+    case AuditStatus.PUBLISH_PENDING: // 01 上架审核中 → 全部隐藏
       return { showPublish: false, showUnpublish: false, showEdit: false, showDelete: false }
-    case AuditStatus.PUBLISHED:         // 02 已上架 → 仅申请下架
+    case AuditStatus.PUBLISHED: // 02 已上架 → 仅申请下架
       return { showPublish: false, showUnpublish: true, showEdit: false, showDelete: false }
-    case AuditStatus.PUBLISH_REJECTED:  // 03 上架被驳回 → 申请上架 + 编辑 + 删除
+    case AuditStatus.PUBLISH_REJECTED: // 03 上架被驳回 → 申请上架 + 编辑 + 删除
       return { showPublish: true, showUnpublish: false, showEdit: true, showDelete: true }
     case AuditStatus.UNPUBLISH_PENDING: // 04 下架审核中 → 全部隐藏
       return { showPublish: false, showUnpublish: false, showEdit: false, showDelete: false }
-    case AuditStatus.UNPUBLISHED:       // 05 已下架 → 申请上架 + 编辑 + 删除
+    case AuditStatus.UNPUBLISHED: // 05 已下架 → 申请上架 + 编辑 + 删除
       return { showPublish: true, showUnpublish: false, showEdit: true, showDelete: true }
-    case AuditStatus.UNPUBLISH_REJECTED:// 06 下架被驳回 → 全部隐藏（关键修复：之前错误地显示了申请下架）
-      return { showPublish: false, showUnpublish: false, showEdit: false, showDelete: false }
+    case AuditStatus.UNPUBLISH_REJECTED: // 06 下架被驳回 → 可重新申请下架
+      return { showPublish: false, showUnpublish: true, showEdit: false, showDelete: false }
     default:
       // 未知状态默认可申请上架 + 编辑 + 删除
       return { showPublish: true, showUnpublish: false, showEdit: true, showDelete: true }
@@ -138,6 +139,11 @@ export function getButtonVisibility(item: {
  * │   → 任一 '03' 返回 03（上架被驳回）                               │
  * │   → 按钮: 申请上架 + 编辑 + 删除                                  │
  * ├─────────────────────────────────────────────────────────────────┤
+ * │ 规则6: super 或 dept 任一为 '06'                                  │
+ * │   → 返回 06（下架被驳回，可重新申请下架）                          │
+ * │   → 按钮: 申请下架                                               │
+ * │   注意：必须在规则3/4/5之前，否则 '01'/'04'/'02'/'05' 会抢先匹配  │
+ * ├─────────────────────────────────────────────────────────────────┤
  * │ 规则3: super 或 dept 任一为 '01' 或 '04'                          │
  * │   → '01' 返回 01（上架审核中），'04' 返回 04（下架审核中）         │
  * │   → 按钮: 全部隐藏                                               │
@@ -149,10 +155,6 @@ export function getButtonVisibility(item: {
  * │ 规则5: super === '05'                                            │
  * │   → 返回 05（已下架）                                             │
  * │   → 按钮: 申请上架 + 编辑 + 删除                                  │
- * ├─────────────────────────────────────────────────────────────────┤
- * │ 规则6: super 或 dept 任一为 '06'                                  │
- * │   → 返回 06（下架被驳回）                                         │
- * │   → 按钮: 全部隐藏                                               │
  * └─────────────────────────────────────────────────────────────────┘
  *
  * 重要前提：调用方需要先判断 _source 字段。
@@ -180,6 +182,13 @@ export function getStatus(item: {
     return AuditStatus.SILENT // '00' 可申请上架
   }
 
+  // ── 规则6: 两个状态有一个是'06' ──
+  // '06' → 下架被驳回（审核未通过，可重新申请下架）
+  // 注意：规则6 必须在规则3/4/5之前判断，否则 '01'/'04'/'02'/'05' 会抢先匹配
+  if (dept === '06' || sup === '06') {
+    return AuditStatus.UNPUBLISH_REJECTED // '06' 下架被驳回
+  }
+
   // ── 规则3: 两个状态有一个是'01'或者是'04' ──
   // '01' → 上架审核中（等待部门或超管审核，不允许任何操作）
   // '04' → 下架审核中（等待部门或超管审核，不允许任何操作）
@@ -200,12 +209,6 @@ export function getStatus(item: {
   // '05' → 已下架（可重新申请上架、编辑、删除）
   if (sup === '05') {
     return AuditStatus.UNPUBLISHED // '05' 已下架
-  }
-
-  // ── 规则6: 两个状态有一个是'06' ──
-  // '06' → 下架被驳回（需联系管理员处理，不允许任何操作）
-  if (dept === '06' || sup === '06') {
-    return AuditStatus.UNPUBLISH_REJECTED // '06' 下架被驳回
   }
 
   // ── 默认: 静默状态 ──

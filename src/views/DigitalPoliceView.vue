@@ -246,6 +246,7 @@
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         destroy-on-close
+        align-center
         class="ds-modal"
       >
         <div class="form-grid">
@@ -271,15 +272,6 @@
             <textarea
               v-model="form.sceneDesc"
               placeholder="请描述该数字警员负责的业务场景与职责"
-            ></textarea>
-          </div>
-          <div class="form-item full">
-            <label>系统提示词（System Prompt） <span class="req">*</span></label>
-            <textarea
-              v-model="form.systemPrompt"
-              rows="6"
-              class="form-textarea-mono"
-              placeholder="定义数字警员的角色、能力边界、输出格式与约束。例如：&#10;你是人员信息核查员，负责...&#10;能力范围：...&#10;输出要求：...&#10;约束：严禁泄露未授权信息..."
             ></textarea>
           </div>
           <div class="form-item full">
@@ -317,6 +309,15 @@
               <span v-if="mcpOptions.length === 0" class="pick-empty">暂无可用MCP服务</span>
             </div>
           </div>
+          <div class="form-item full">
+            <label>系统提示词（System Prompt） <span class="req">*</span></label>
+            <textarea
+              v-model="form.systemPrompt"
+              rows="6"
+              class="form-textarea-mono"
+              placeholder="定义数字警员的角色、能力边界、输出格式与约束。例如：&#10;你是人员信息核查员，负责...&#10;能力范围：...&#10;输出要求：...&#10;约束：严禁泄露未授权信息..."
+            ></textarea>
+          </div>
         </div>
         <div class="info-tip">
           💡
@@ -339,6 +340,7 @@
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         destroy-on-close
+        align-center
         class="ds-modal"
       >
         <div v-if="authOfficer" class="auth-panel">
@@ -407,6 +409,7 @@
         width="480px"
         :close-on-click-modal="false"
         destroy-on-close
+        align-center
         class="ds-modal"
       >
         <template #header>
@@ -894,10 +897,28 @@ function openCreateDialog() {
   formDialogVisible.value = true
 }
 
-function openEditDialog(officer: OfficerItem) {
+async function openEditDialog(officer: OfficerItem) {
   isEditing.value = true
   editingId.value = officer.id
   const cfg = (officer.config || {}) as Record<string, unknown>
+
+  // 从 API 加载实际关联的资源 ID，确保回填准确
+  let skillIdsFromApi: number[] = []
+  let mcpIdsFromApi: number[] = []
+  try {
+    const resources = await officerApi.getResources(officer.id)
+    skillIdsFromApi = resources
+      .filter((r) => r.resource_type === 'skill')
+      .map((r) => r.resource_id)
+    mcpIdsFromApi = resources
+      .filter((r) => r.resource_type === 'mcp')
+      .map((r) => r.resource_id)
+  } catch {
+    // 接口失败时回退到 config 中的数据
+    skillIdsFromApi = Array.isArray(cfg.skillIds) ? (cfg.skillIds as number[]) : []
+    mcpIdsFromApi = Array.isArray(cfg.mcpIds) ? (cfg.mcpIds as number[]) : []
+  }
+
   form.value = {
     officer_name: officer.officer_name,
     officer_code: officer.officer_code || '',
@@ -911,8 +932,8 @@ function openEditDialog(officer: OfficerItem) {
       (typeof cfg.systemPrompt === 'string' ? cfg.systemPrompt : '') ||
       (typeof cfg.prompt === 'string' ? cfg.prompt : '') ||
       '',
-    selectedSkillIds: Array.isArray(cfg.skillIds) ? (cfg.skillIds as number[]) : [],
-    selectedMcpIds: Array.isArray(cfg.mcpIds) ? (cfg.mcpIds as number[]) : [],
+    selectedSkillIds: skillIdsFromApi,
+    selectedMcpIds: mcpIdsFromApi,
   }
   loadSkillOptions()
   loadMcpOptions()
@@ -960,12 +981,13 @@ async function handleSubmit() {
     }
 
     if (isEditing.value && editingId.value) {
-      // 编辑模式：更新警员基本信息 + 资源关联
+      // 编辑模式：更新警员基本信息 + 资源关联 + config
       await officerApi.update({
         id: editingId.value,
         officer_code: form.value.officer_code.trim() || undefined,
         officer_name: form.value.officer_name.trim(),
         description: form.value.sceneDesc.trim(),
+        config,
         skill_ids: form.value.selectedSkillIds.join(',') || undefined,
         mcp_ids: form.value.selectedMcpIds.join(',') || undefined,
       })

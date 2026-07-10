@@ -459,6 +459,7 @@
       width="480px"
       :close-on-click-modal="false"
       destroy-on-close
+      align-center
       class="ds-modal"
     >
       <template #header>

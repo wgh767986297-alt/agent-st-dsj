@@ -91,7 +91,6 @@
             <div v-if="hasSkillActions(skill)" class="ds-card-actions">
               <button v-if="getButtonVisibility(skill).showPublish" class="ds-btn-mini-primary" @click="publishSkill(skill)">申请上架</button>
               <button v-if="getButtonVisibility(skill).showUnpublish" class="ds-btn-mini-primary" @click="unpublishSkill(skill)">申请下架</button>
-              <button v-if="isManageMode || getButtonVisibility(skill).showEdit" class="ds-btn-mini-outline" @click="editSkill(skill)">编辑</button>
               <button v-if="getButtonVisibility(skill).showDelete" class="ds-btn-mini-danger" @click="deleteSkill(skill)">删除</button>
             </div>
           </div>
@@ -195,6 +194,7 @@
       destroy-on-close
       :close-on-click-modal="false"
       :close-on-press-escape="false"
+      align-center
       class="ds-modal ds-skill-upload-modal"
       title="上传技能"
     >
@@ -281,6 +281,7 @@
       width="480px"
       :close-on-click-modal="false"
       destroy-on-close
+      align-center
       class="ds-modal"
     >
       <template #header>
@@ -347,6 +348,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getSkillTemplate,
   uploadSkill,
+  deleteSkill as deleteAgentSkill,
 } from '@/api/skillsMarket'
 import { skillManageApi, type SkillItem as SkillManageItem } from '@/api/skillManage'
 import { getMyResources, getPublicResources, type MySkillItem, type PublicResourceItem } from '@/api/resource'
@@ -384,6 +386,8 @@ interface SkillItem {
   dept_audit_status?: string
   super_audit_status?: string
   _source?: 'created' | 'authorized'
+  /** 技能目录名，用于智能体侧删除接口 */
+  skillCode?: string
 }
 
 // ============ Tab State ============
@@ -526,6 +530,7 @@ const normalizeSkill = (skill: SkillManageItem & { _source?: string }, index: nu
   dept_audit_status: skill.dept_audit_status,
   super_audit_status: skill.super_audit_status,
   _source: (skill as any)._source,
+  skillCode: skill.skill_code,
 })
 
 // ============ API Logic ============
@@ -663,6 +668,10 @@ const publishSkill = async (skill: SkillItem) => {
   try {
     await skillManageApi.applyPublish(skill.originalId)
     ElMessage.success(`技能「${skill.title}」上架申请已提交，请等待审核`)
+    // 刷新列表以同步状态（申请上架后状态应变更为审核中）
+    fullSkillItems.value = []
+    fullSkillListLoaded.value = false
+    await loadSkills()
   } catch (e: any) {
     ElMessage.error(e.message || '申请上架失败')
   }
@@ -687,10 +696,6 @@ const unpublishSkill = async (skill: SkillItem) => {
   }
 }
 
-const editSkill = (skill: SkillItem) => {
-  ElMessage.info(`编辑技能「${skill.title}」功能开发中`)
-}
-
 const deleteSkill = async (skill: SkillItem) => {
   try {
     await ElMessageBox.confirm(
@@ -698,7 +703,17 @@ const deleteSkill = async (skill: SkillItem) => {
       '删除确认',
       { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' },
     )
+    // 1. 先调用后台删除接口
     await skillManageApi.delete(skill.originalId)
+    // 2. 再调用智能体侧删除接口清理技能目录
+    if (skill.skillCode) {
+      try {
+        await deleteAgentSkill(skill.skillCode)
+      } catch {
+        // 智能体侧删除失败不影响主流程，仅提示
+        ElMessage.warning(`技能「${skill.title}」已从平台删除，但智能体侧清理可能未完成`)
+      }
+    }
     ElMessage.success(`技能「${skill.title}」已删除`)
     // 重新加载列表
     fullSkillItems.value = []

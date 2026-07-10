@@ -68,6 +68,7 @@ import { useChatStore } from '@/stores/chat'
 import { getFileIcon } from '@/utils/fileUtils'
 import { normalizeStreamingMarkdown } from '@/utils/markdownStream'
 import { normalizeStreamingUrls } from '@/utils/markdownUrl'
+import { transformMinioUrlsInText, transformMinioUrl } from '@/utils/urlTransform'
 import arrowRightIcon from '@/assets/icons/chat/icon-chat-arrow-right.png'
 
 interface Props {
@@ -177,6 +178,8 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
     if (href.startsWith('http://') || href.startsWith('https://')) {
       token.attrSet('class', 'external-link')
     }
+    // 注：零信任令牌追加在 sanitizeAndRender 末尾统一对最终 HTML 做正则后处理，
+    // 确保覆盖 markdown 链接 + 原始 HTML <a> 标签，避免漏掉任何一种
   }
 
   return self.renderToken(tokens, idx, options)
@@ -207,8 +210,11 @@ const sanitizeAndRender = (content: string) => {
   // ✅ 先修复 URL 中的空格问题
   const normalizedContent = normalizeStreamingUrls(normalizeStreamingMarkdown(content))
 
+  // ✅ 将 MinIO 原始链接替换为代理地址 + 零信任令牌，确保流式输出展示与点击打开一致
+  const transformedContent = transformMinioUrlsInText(normalizedContent)
+
   // ✅ 预处理 <action> 标签
-  const processedContent = processActionTags(normalizedContent)
+  const processedContent = processActionTags(transformedContent)
 
   // 先通过 MarkdownIt 渲染
   const rendered = md.render(processedContent)
@@ -270,6 +276,8 @@ const sanitizeAndRender = (content: string) => {
     FORBID_ATTR: ['onload', 'onclick', 'onmouseover'],
   })
 
+  // 注：链接的域名映射和零信任令牌拼接已在渲染时（transformMinioUrlsInText）处理，
+  // 此处 handleActionClick 作为兜底，确保点击时再次转换（幂等安全）
   return clean
 }
 
@@ -329,12 +337,31 @@ const emit = defineEmits<{
   (e: 'send-message', text: string): void
 }>()
 
-// ✅ action 标签点击事件委托
+// ✅ 容器点击事件委托：处理 action 标签 + 外部链接域名映射及令牌拼接
 const handleActionClick = (e: MouseEvent) => {
-  const el = (e.target as HTMLElement).closest?.('.action-tag--clickable')
-  if (el) {
-    const text = el.getAttribute('data-action-text')
+  // 1. 优先处理 action 标签点击
+  const actionEl = (e.target as HTMLElement).closest?.('.action-tag--clickable')
+  if (actionEl) {
+    const text = actionEl.getAttribute('data-action-text')
     if (text) emit('send-message', text)
+    return
+  }
+
+  // 2. 拦截 <a> 标签点击，做域名映射 + token 拼接后在新标签页打开
+  const linkEl = (e.target as HTMLElement).closest?.('a[href]')
+  if (linkEl) {
+    const rawHref = linkEl.getAttribute('href')
+    if (!rawHref) return
+
+    // 只处理外部链接
+    if (!rawHref.startsWith('http://') && !rawHref.startsWith('https://')) return
+
+    e.preventDefault()
+
+    // 域名映射 + token 拼接（幂等，与渲染时的转换一致）
+    const finalUrl = transformMinioUrl(rawHref)
+
+    window.open(finalUrl, '_blank', 'noopener,noreferrer')
   }
 }
 </script>
@@ -378,6 +405,7 @@ const handleActionClick = (e: MouseEvent) => {
   height: 24px;
   object-fit: contain;
   flex-shrink: 0;
+  display: none;
 }
 
 .file-info-content {
@@ -391,7 +419,6 @@ const handleActionClick = (e: MouseEvent) => {
   font-weight: 500;
   max-width: 150px;
   overflow: hidden;
-  color: var(--el-menu-text-color);
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;

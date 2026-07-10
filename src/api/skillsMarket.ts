@@ -72,7 +72,7 @@ const apiUrl = () => import.meta.env.VITE_CHAT_API_BASE || ''
 export const getSkillTemplate = async (): Promise<SkillTemplateResponse> => {
   const baseUrl = apiUrl()
   const response = await skillsMarketApi.get<SkillTemplateResponse, SkillTemplateResponse>(
-    `${baseUrl}/api/skills/template`,
+    `${baseUrl}/get_skill_template`,
   )
   return response
 }
@@ -99,6 +99,20 @@ export const uploadSkill = async (
     {
       headers: { 'Content-Type': undefined },
     },
+  )
+  return response
+}
+
+export interface DeleteSkillResponse {
+  status?: string
+  message?: string
+  path?: string
+}
+
+export const deleteSkill = async (skillName: string): Promise<DeleteSkillResponse> => {
+  const baseUrl = apiUrl()
+  const response = await skillsMarketApi.delete<DeleteSkillResponse, DeleteSkillResponse>(
+    `${baseUrl}/skill/${encodeURIComponent(skillName)}`,
   )
   return response
 }

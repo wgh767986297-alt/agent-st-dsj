@@ -580,7 +580,7 @@ defineExpose({
     v-model="visible"
     title="附件中心"
     width="720px"
-    top="5vh"
+    align-center
     class="appendix-center-dialog"
     :close-on-click-modal="false"
     @open="loadAppendixList()"
@@ -711,7 +711,7 @@ defineExpose({
     v-model="previewVisible"
     :title="previewItem?.file_name || '文件预览'"
     width="80%"
-    top="5vh"
+    align-center
     class="appendix-preview-dialog"
     :close-on-click-modal="true"
     @close="closePreview"

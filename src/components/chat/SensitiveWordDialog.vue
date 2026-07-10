@@ -65,7 +65,7 @@ watch(
     :close-on-press-escape="false"
     :show-close="false"
     width="440px"
-    top="20vh"
+    align-center
     destroy-on-close
     @update:model-value="(val: boolean) => !val && handleClose()"
   >

@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { setThemePageOverride } from '@/composables/useTheme'
-import { isAdminAccount, isDepartmentAdmin, isLoggedIn, isSecurityAuditor } from '@/utils/auth'
+import { isAdminAccount, isDepartmentAdmin, isLoggedIn, isSecurityAuditor, clearAuth } from '@/utils/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -80,6 +80,19 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  // 零信任登录：URL 携带 userToken / appToken 时，强制清除旧登录态
+  // 避免上一个用户的 token 导致 isLoggedIn() 为 true，跳过登录页
+  const userToken = to.query.userToken as string | undefined
+  const appToken = to.query.appToken as string | undefined
+  if (userToken && appToken) {
+    sessionStorage.setItem('rzzx_user_token', userToken)
+    sessionStorage.setItem('rzzx_app_token', appToken)
+    // 如果当前有旧用户 token，清除之，确保进入登录页走零信任登录流程
+    if (isLoggedIn()) {
+      clearAuth()
+    }
+  }
+
   if (to.meta.title) {
     document.title = to.meta.title as string
   }

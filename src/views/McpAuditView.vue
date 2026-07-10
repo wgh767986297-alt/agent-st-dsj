@@ -163,7 +163,7 @@
     </main>
 
     <!-- ===== 审核弹窗 ===== -->
-    <el-dialog v-model="auditDialogVisible" :title="auditDialogTitle" width="460px" :close-on-click-modal="false" destroy-on-close class="ds-modal">
+    <el-dialog v-model="auditDialogVisible" :title="auditDialogTitle" width="460px" :close-on-click-modal="false" destroy-on-close align-center class="ds-modal">
       <div v-if="auditTarget" class="audit-confirm">
         <div class="audit-confirm__info">
           <span>服务：</span><strong>{{ auditTarget.service_name }}</strong>
@@ -185,7 +185,7 @@
     </el-dialog>
 
     <!-- ===== 申请下架弹窗 ===== -->
-    <el-dialog v-model="removeDialogVisible" title="申请下架" width="460px" :close-on-click-modal="false" destroy-on-close class="ds-modal">
+    <el-dialog v-model="removeDialogVisible" title="申请下架" width="460px" :close-on-click-modal="false" destroy-on-close align-center class="ds-modal">
       <div v-if="removeTarget" class="audit-confirm">
         <div class="audit-confirm__info">
           <span>服务：</span><strong>{{ removeTarget.service_name }}</strong>

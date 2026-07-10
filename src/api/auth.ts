@@ -239,7 +239,7 @@ export const authApi = {
   /** 零信任登录（第三方平台映射），token 通过请求头传递 */
   async loginByZeroTrust(userToken: string, appToken: string): Promise<LoginResult> {
     const response = await postJson<LoginResult, Partial<LoginResult>>(
-      '/zero-trust/login.xhtml',
+      '/dsjpt/jk/zero-trust/login.xhtml',
       {},
       {
         'RZZX-USERTOKEN': userToken,
@@ -247,9 +247,11 @@ export const authApi = {
       },
     )
 
+    // 兼容多种 token 位置：data.token → result.token → 顶层 token
     const token =
       ((response.data as Record<string, unknown> | undefined)?.token as string | undefined) ||
-      response.result?.token
+      response.result?.token ||
+      (response as unknown as Record<string, unknown>).token as string | undefined
 
     if (!token) {
       throw new Error(response.message || '登录成功但未返回 token')

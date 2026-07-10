@@ -1,4 +1,9 @@
-import { getCurrentAccount, getStoredUserProfile, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
+import {
+  getCurrentAccount,
+  getStoredUserProfile,
+  handleAuthExpired,
+  isAuthExpiredResponse,
+} from '@/utils/auth'
 
 interface BehaviorCheckResult {
   is_sensitive: boolean
@@ -229,7 +234,8 @@ export const chatServices = {
     formData.append('file', file)
     formData.append('usr', getCurrentAccount())
 
-    const baseURL = import.meta.env.VITE_CHAT_API_BASE || '/chatApi'
+    const baseURL = import.meta.env.VITE_CHAT_API_BASE || ''
+
     return fetch(`${baseURL}/upload`, {
       method: 'POST',
       body: formData,

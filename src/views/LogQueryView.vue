@@ -226,7 +226,7 @@
           </div>
           <button class="conversation-detail__close-btn" @click="closeConversationDetail" aria-label="关闭">&times;</button>
         </header>
-        <div class="conversation-detail__body">
+        <div class="conversation-detail__body" @click="handleConversationLinkClick">
           <div v-if="!selectedConversation.messages.length" class="conversation-detail__empty">
             暂无可展示的对话内容
           </div>
@@ -241,6 +241,42 @@
               }"
             >
               <div class="conversation-bubble">
+                <!-- 用户消息携带的元数据标签（气泡内顶部） -->
+                <div
+                  v-if="message.role === 'user' && (message.files.length || message.officers.length || message.mcps.length || message.skills.length)"
+                  class="conversation-meta-tags"
+                >
+                  <span
+                    v-for="(skill, si) in message.skills"
+                    :key="`skill-${si}`"
+                    class="conversation-meta-tag conversation-meta-tag--skill"
+                  >
+                    <span class="conversation-meta-tag__mark">@</span>{{ skill.name }}
+                  </span>
+                  <span
+                    v-for="(officer, oi) in message.officers"
+                    :key="`officer-${oi}`"
+                    class="conversation-meta-tag conversation-meta-tag--officer"
+                  >
+                    警员: {{ officer.officer_name }}
+                  </span>
+                  <span
+                    v-for="(mcp, mi) in message.mcps"
+                    :key="`mcp-${mi}`"
+                    class="conversation-meta-tag conversation-meta-tag--mcp"
+                  >
+                    MCP: {{ mcp.service_name }}
+                  </span>
+                  <span
+                    v-for="(file, fi) in message.files"
+                    :key="`file-${fi}`"
+                    class="conversation-meta-tag conversation-meta-tag--file"
+                  >
+                    附件: {{ file.filename }}
+                    <span v-if="file.size" class="conversation-meta-tag__size">({{ formatFileSizeForAudit(file.size) }})</span>
+                  </span>
+                </div>
+
                 <div
                   v-if="message.thinkingBlocks.length || message.toolCallGroups.length"
                   class="conversation-insight-list"
@@ -326,6 +362,7 @@ import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { normalizeStreamingMarkdown } from '@/utils/markdownStream'
 import { normalizeStreamingUrls } from '@/utils/markdownUrl'
+import { transformMinioUrlsInText, transformMinioUrl } from '@/utils/urlTransform'
 import {
   getConversationLogs,
   getLoginLogs,
@@ -380,6 +417,31 @@ interface ConversationMessage {
   contentBlocks: ConversationContentBlock[]
   thinkingBlocks: ConversationThinkingBlock[]
   toolCallGroups: ConversationToolCallGroup[]
+  files: ConversationFile[]
+  officers: ConversationOfficer[]
+  mcps: ConversationMcp[]
+  skills: ConversationSkill[]
+}
+
+interface ConversationFile {
+  file_id?: string
+  filename?: string
+  size?: number
+}
+
+interface ConversationOfficer {
+  id?: number
+  officer_name?: string
+}
+
+interface ConversationMcp {
+  id?: number
+  service_name?: string
+}
+
+interface ConversationSkill {
+  name?: string
+  category?: string
 }
 
 interface ConversationContentBlock {
@@ -814,7 +876,7 @@ const normalizeToolCallGroups = (
 const parseConversationMessages = (content?: string): ConversationMessage[] => {
   if (!content) return []
   try {
-    const parsed = JSON.parse(content) as Array<{ role?: string; content?: string }>
+    const parsed = JSON.parse(content) as Array<Record<string, unknown>>
     if (Array.isArray(parsed)) {
       return parsed
         .map((message) => {
@@ -829,17 +891,65 @@ const parseConversationMessages = (content?: string): ConversationMessage[] => {
             .map((block) => block.content)
             .join('\n\n')
             .trim()
+
+          // 提取 files / officers / mcps / skills
+          const files: ConversationFile[] = Array.isArray(record.files)
+            ? (record.files as Array<Record<string, unknown>>).map((f) => ({
+                file_id: String(f.file_id || f.fileId || ''),
+                filename: String(f.filename || f.fileName || ''),
+                size: Number(f.size || 0),
+              }))
+            : []
+          const officers: ConversationOfficer[] = Array.isArray(record.officers)
+            ? (record.officers as Array<Record<string, unknown>>).map((o) => ({
+                id: Number(o.id || 0),
+                officer_name: String(o.officer_name || ''),
+              }))
+            : []
+          const mcps: ConversationMcp[] = Array.isArray(record.mcps)
+            ? (record.mcps as Array<Record<string, unknown>>).map((m) => ({
+                id: Number(m.id || 0),
+                service_name: String(m.service_name || ''),
+              }))
+            : []
+          const skills: ConversationSkill[] = (() => {
+            const raw = record.skills || record.skill
+            if (Array.isArray(raw)) {
+              return (raw as Array<Record<string, unknown>>).map((s) => ({
+                name: String(s.name || ''),
+                category: String(s.category || ''),
+              }))
+            }
+            if (raw && typeof raw === 'object') {
+              return [{
+                name: String((raw as Record<string, unknown>).name || ''),
+                category: String((raw as Record<string, unknown>).category || ''),
+              }]
+            }
+            return []
+          })()
+
           return {
             role: normalizeMessageRole(String(record.role || '')),
             content: textFromBlocks || String(record.content || '').trim(),
             contentBlocks,
             thinkingBlocks: normalizeThinkingBlocks(record, contentBlocks),
             toolCallGroups: normalizeToolCallGroups(record, contentBlocks),
+            files,
+            officers,
+            mcps,
+            skills,
           }
         })
         .filter(
           (message) =>
-            message.content || message.thinkingBlocks.length || message.toolCallGroups.length,
+            message.content ||
+            message.thinkingBlocks.length ||
+            message.toolCallGroups.length ||
+            message.files.length ||
+            message.officers.length ||
+            message.mcps.length ||
+            message.skills.length,
         )
     }
   } catch {
@@ -850,6 +960,10 @@ const parseConversationMessages = (content?: string): ConversationMessage[] => {
         contentBlocks: [],
         thinkingBlocks: [],
         toolCallGroups: [],
+        files: [],
+        officers: [],
+        mcps: [],
+        skills: [],
       },
     ]
   }
@@ -863,10 +977,22 @@ const buildConversationPreview = (messages: ConversationMessage[]) => {
   return preview.length > 80 ? `${preview.slice(0, 80)}...` : preview || '-'
 }
 
+const stripActionTags = (content: string): string => {
+  if (!content) return content
+  // 移除 <action cmd="...">...</action> 标签及其内容（审计日志不需要交互元素）
+  return content
+    .replace(/<action\s+[^>]*>[\s\S]*?<\/action>/g, '')
+    .replace(/\s{2,}/g, ' ')
+}
+
 const renderConversationMarkdown = (content: string) => {
-  const rendered = conversationMarkdown.render(
-    normalizeStreamingUrls(normalizeStreamingMarkdown(content || '')),
+  // 1. 剥离 action 标签
+  const stripped = stripActionTags(content || '')
+  // 2. URL 规范化 + MinIO 链接转换（域名映射 + token 拼接）
+  const transformed = transformMinioUrlsInText(
+    normalizeStreamingUrls(normalizeStreamingMarkdown(stripped)),
   )
+  const rendered = conversationMarkdown.render(transformed)
   return DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: [
       'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
@@ -904,6 +1030,14 @@ const formatToolArgs = (value: unknown) => {
   } catch {
     return String(value ?? '')
   }
+}
+
+const formatFileSizeForAudit = (bytes: number): string => {
+  if (!bytes || bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 const normalizeConversationRows = (items: ConversationLogItem[]): NormalizedConversationLog[] => {
@@ -1047,6 +1181,23 @@ const handleConversationDetailClosed = () => {
 
 const isConversationDetailActive = (row: NormalizedConversationLog) => {
   return conversationDetailVisible.value && selectedConversation.value?.id === row.id
+}
+
+/** 对话详情中的链接点击拦截：域名映射 + 最新令牌拼接 */
+const handleConversationLinkClick = (e: MouseEvent) => {
+  const linkEl = (e.target as HTMLElement).closest?.('a[href]')
+  if (!linkEl) return
+
+  const rawHref = linkEl.getAttribute('href')
+  if (!rawHref) return
+
+  // 只处理外部链接
+  if (!rawHref.startsWith('http://') && !rawHref.startsWith('https://')) return
+
+  e.preventDefault()
+  // 每次点击时重新从 sessionStorage 获取最新令牌
+  const finalUrl = transformMinioUrl(rawHref)
+  window.open(finalUrl, '_blank', 'noopener,noreferrer')
 }
 
 // ========== Operation log helpers ==========
@@ -1273,6 +1424,98 @@ onMounted(() => {
 .conversation-bubble-row--user .conversation-bubble {
   border-color: color-mix(in srgb, var(--ds-primary) 28%, var(--ds-border));
   background: color-mix(in srgb, var(--ds-primary) 9%, var(--ds-card));
+}
+
+/* 用户消息元数据标签：文件 / 警员 / MCP / 技能 */
+.conversation-meta-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.conversation-meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.conversation-meta-tag--skill {
+  color: #2563eb;
+  background: #2563eb18;
+  border: 1px solid #2563eb33;
+}
+
+.conversation-meta-tag__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  color: #fff;
+  background: #2563eb;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.conversation-meta-tag--officer {
+  color: #059669;
+  background: #05966915;
+  border: 1px solid #05966930;
+}
+
+.conversation-meta-tag--mcp {
+  color: #7c3aed;
+  background: #7c3aed15;
+  border: 1px solid #7c3aed30;
+}
+
+.conversation-meta-tag--file {
+  color: #d97706;
+  background: #d9770615;
+  border: 1px solid #d9770630;
+}
+
+.conversation-meta-tag__size {
+  font-weight: 400;
+  opacity: 0.7;
+  font-size: 11px;
+}
+
+/* 深色模式适配 */
+:root[data-theme='dark'] .conversation-meta-tag--skill {
+  color: #60a5fa;
+  background: #60a5fa18;
+  border-color: #60a5fa33;
+}
+
+:root[data-theme='dark'] .conversation-meta-tag--officer {
+  color: #34d399;
+  background: #34d39918;
+  border-color: #34d39933;
+}
+
+:root[data-theme='dark'] .conversation-meta-tag--mcp {
+  color: #a78bfa;
+  background: #a78bfa18;
+  border-color: #a78bfa33;
+}
+
+:root[data-theme='dark'] .conversation-meta-tag--file {
+  color: #fbbf24;
+  background: #fbbf2418;
+  border-color: #fbbf2433;
+}
+
+:root[data-theme='dark'] .conversation-meta-tag__mark {
+  color: #fff;
+  background: #60a5fa;
 }
 
 .conversation-bubble__content {

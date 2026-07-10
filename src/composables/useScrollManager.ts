@@ -86,7 +86,14 @@ export function useScrollManager(scrollThreshold = 50) {
     scrollDebounceRAF = requestAnimationFrame(() => {
       const nextAtBottom = checkIsAtBottom(wrapRef)
       isAtBottom.value = nextAtBottom
-      isUserScrolling.value = !nextAtBottom
+      // 🔧 rAF 回调的策略：允许解锁（true→false），但不加锁（false→true）。
+      // 这是为了避免流式输出时的竞态：rAF 可能在 smartScrollToBottom 之前执行，
+      // 此时新内容已增长但尚未滚动，若此处设置 isUserScrolling=true 会阻断后续自动滚动。
+      // 同步检查（上面的代码）已经正确设置了初始状态，此处仅做兜底恢复。
+      if (nextAtBottom) {
+        // 确实在底部 → 安全地解锁自动滚动
+        isUserScrolling.value = false
+      }
     })
   }
 
@@ -125,9 +132,11 @@ export function useScrollManager(scrollThreshold = 50) {
 
         lastScrollTime = Date.now()
 
-        // 异步更新状态
+        // 异步更新状态（同步更新 isUserScrolling，避免残留的 true 值阻断后续自动滚动）
         nextTick(() => {
-          isAtBottom.value = checkIsAtBottom(wrapRef)
+          const atBottom = checkIsAtBottom(wrapRef)
+          isAtBottom.value = atBottom
+          isUserScrolling.value = !atBottom
         })
       }
       return

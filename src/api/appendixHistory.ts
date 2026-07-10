@@ -3,7 +3,7 @@ import { AUTH_TOKEN_KEY, getCurrentAccount, handleAuthExpired, isAuthExpiredResp
 
 // ✅ 附件历史 API 实例
 const appendixApi = axios.create({
-  baseURL: import.meta.env.VITE_CHAT_API_BASE,
+  baseURL: import.meta.env.VITE_CHAT_API_BASE || '/chatApi',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

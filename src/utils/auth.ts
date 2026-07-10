@@ -294,10 +294,12 @@ export function isAdminAccount(): boolean {
 }
 
 export function saveAuth(token: string, profile?: StoredUserProfile): void {
-  const previousRoles = getStoredRoles()
   localStorage.setItem(AUTH_TOKEN_KEY, token)
 
   if (!profile) {
+    // Token 刷新场景：只更新 token 和角色，不动已有 profile
+    // 保留旧角色兜底，防止新 token 的 JWT 不含角色信息导致角色丢失
+    const previousRoles = getStoredRoles()
     const tokenRoles = getRolesFromToken()
     runtimeRoles = [...new Set([...tokenRoles, ...previousRoles])]
     setStoredRoles(runtimeRoles)
@@ -305,7 +307,20 @@ export function saveAuth(token: string, profile?: StoredUserProfile): void {
     return
   }
 
-  const current = getStoredUserProfile()
+  // 登录场景（传入了 profile）：清除上一次登录的旧用户数据，防止切换账号后残留上一个用户的信息
+  localStorage.removeItem(USER_PROFILE_KEY)
+  localStorage.removeItem(USER_ROLE_KEY)
+  localStorage.removeItem(USER_ACCOUNT_KEY)
+  localStorage.removeItem('name')
+  localStorage.removeItem('username')
+  localStorage.removeItem('realName')
+  localStorage.removeItem('role')
+  localStorage.removeItem('idCard')
+  localStorage.removeItem('id_card')
+  localStorage.removeItem('identityCard')
+  localStorage.removeItem('company')
+  localStorage.removeItem('department')
+
   // 优先使用 role_list 数组
   const profileRoles = profile.role_list && profile.role_list.length > 0
     ? profile.role_list
@@ -315,7 +330,8 @@ export function saveAuth(token: string, profile?: StoredUserProfile): void {
   const tokenRoles = getRolesFromToken()
   runtimeRoles = [...new Set([...profileRoles, ...tokenRoles])]
   setStoredRoles(runtimeRoles)
-  const nextProfile = { ...current, ...profileWithoutRole, role_list: runtimeRoles }
+  // 不使用旧 profile 合并，直接用新数据写入，避免跨用户数据泄露
+  const nextProfile = { ...profileWithoutRole, role_list: runtimeRoles }
   localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(nextProfile))
   authStateVersion.value += 1
 }

@@ -121,7 +121,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { View, Hide, User, Lock, CircleCheckFilled } from '@element-plus/icons-vue'
 import { authApi, decodeJwtPayload, type LoginResult } from '@/api/auth'
-import { saveAuth } from '@/utils/auth'
+import { saveAuth, clearAuth } from '@/utils/auth'
 import { getClientIp } from '@/utils/clientIp'
 import iconLogo from '@/assets/icons/chat/icon-jh.png'
 
@@ -235,7 +235,12 @@ const tryZeroTrustLogin = async () => {
   loading.value = true
 
   try {
+    // 清除上一次登录的旧用户缓存，防止切换账号后残留上一个用户的信息
+    clearAuth()
     const loginResult = await authApi.loginByZeroTrust(userToken, appToken)
+    // 保存零信任令牌，供后续消息中的链接跨域携带
+    sessionStorage.setItem('rzzx_user_token', userToken)
+    sessionStorage.setItem('rzzx_app_token', appToken)
     await processLoginResult(loginResult)
     return true
   } catch (error) {
@@ -268,6 +273,8 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
+    // 清除上一次登录的旧用户缓存，防止切换账号后残留上一个用户的信息
+    clearAuth()
     const ip = await getClientIp()
     const loginResult = await authApi.login({
       idCard: formData.idCard,

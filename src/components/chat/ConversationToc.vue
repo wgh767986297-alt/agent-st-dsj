@@ -38,19 +38,6 @@
             <span class="toc-item-text">{{ getShortTitle(msg.content) }}</span>
           </div>
         </div>
-        <button
-          class="toc-export-button"
-          type="button"
-          title="导出问题"
-          aria-label="导出问题"
-          @click.stop="exportQuestions"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.41l-4 3.99a1 1 0 0 1-1.4 0l-4-3.99a1 1 0 1 1 1.4-1.41L11 12.59V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"
-            />
-          </svg>
-        </button>
       </div>
     </transition>
   </div>
@@ -58,7 +45,6 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { Message } from '@/types/chat'
 
 interface Props {
@@ -136,31 +122,6 @@ const getShortTitle = (content: string) => {
 let lastClickTime = 0
 const CLICK_THROTTLE = 200 // 200ms 节流
 
-const exportQuestions = () => {
-  if (props.messages.length === 0) {
-    ElMessage.warning('当前没有可导出的问题')
-    return
-  }
-
-  const content = props.messages
-    .map((msg, index) => `${index + 1}. ${msg.content.replace(/\s*\n+\s*/g, ' ').trim()}`)
-    .join('\r\n')
-
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  const now = new Date()
-  const pad = (value: number) => String(value).padStart(2, '0')
-  const filename = `questions_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.txt`
-
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}
-
 const handleItemClick = (id: string) => {
   const now = Date.now()
 
@@ -200,32 +161,30 @@ const handleItemClick = (id: string) => {
 .toc-line-item-default {
   cursor: pointer;
   transition: all 0.2s ease;
-  height: 2px;
+  min-height: 8px;
   display: flex;
   align-items: center;
 }
 
-/* ✅ 短横线基础样式 */
+/* ✅ 默认灰色圆点样式 */
 .toc-line {
-  width: 12px;
-  height: 2px;
+  width: 8px;
+  height: 8px;
   background-color: #cbd5e1;
-  border-radius: 1px;
+  border-radius: 50%;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
-/* ✅ 默认短横线悬停效果 */
+/* ✅ 默认圆点悬停效果 */
 .toc-line-item-default:hover .toc-line {
-  background-color: #1e293b;
-  width: 16px;
+  background-color: #94a3b8;
+  transform: scale(1.2);
 }
 
-/* ✅ 默认短横线激活状态 */
+/* ✅ 激活状态 - 蓝色圆点（项目主题蓝色） */
 .toc-line-item-default.is-active .toc-line {
-  background-color: #3b82f6;
-  width: 16px;
-  height: 3px;
+  background-color: #1a3a6b;
 }
 
 /* ========================================
@@ -309,49 +268,12 @@ const handleItemClick = (id: string) => {
   width: 16px;
 }
 
-/* ✅ 弹窗内项目激活状态 */
+/* ✅ 弹窗内项目激活状态 - 项目主题蓝色 */
 .toc-popup-item.is-active .toc-item-text {
-  color: #2563eb;
+  color: #1a3a6b;
   font-weight: 700;
 }
 
-/* .toc-popup-item.is-active .toc-line {
-  background-color: #3b82f6;
-  width: 16px;
-  height: 3px;
-} */
-
-.toc-export-button {
-  width: 34px;
-  height: 34px;
-  margin-left: auto;
-  border: 1px solid #dbe4f0;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #475569;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease;
-}
-
-.toc-export-button:hover {
-  color: #2563eb;
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  transform: translateY(-1px);
-}
-
-.toc-export-button svg {
-  width: 16px;
-  height: 16px;
-  fill: currentColor;
-}
 
 /* ========================================
    淡入淡出动画
@@ -369,5 +291,47 @@ const handleItemClick = (id: string) => {
 .toc-fade-leave-to {
   opacity: 0;
   transform: translateY(-50%) translateX(10px);
+}
+
+/* ========================================
+   深色模式适配
+   ======================================== */
+:root[data-theme='dark'] .toc-line {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+:root[data-theme='dark'] .toc-line-item-default:hover .toc-line {
+  background-color: rgba(255, 255, 255, 0.45);
+}
+
+:root[data-theme='dark'] .toc-line-item-default.is-active .toc-line {
+  background-color: #00aaff;
+}
+
+:root[data-theme='dark'] .toc-popup {
+  background: rgba(16, 29, 58, 0.98);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(0, 170, 255, 0.15);
+}
+
+:root[data-theme='dark'] .toc-item-text {
+  color: rgba(190, 210, 240, 0.65);
+}
+
+:root[data-theme='dark'] .toc-popup-item:hover .toc-item-text {
+  color: #e4eaf5;
+}
+
+:root[data-theme='dark'] .toc-popup-item.is-active .toc-item-text {
+  color: #00aaff;
+}
+
+:root[data-theme='dark'] .toc-popup-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+:root[data-theme='dark'] .toc-popup-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>

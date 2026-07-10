@@ -522,9 +522,12 @@ const updateChatScrollState = () => {
     0,
     wrapRef.scrollHeight - wrapRef.scrollTop - wrapRef.clientHeight,
   )
-  const atBottom = bottomDistance <= SCROLL_TO_BOTTOM_BUTTON_THRESHOLD
   chatScrollBottomDistance.value = bottomDistance
   isChatScrollable.value = wrapRef.scrollHeight > wrapRef.clientHeight + 1
+  // 🔧 使用 checkIsAtBottom（50px 阈值）与 handleScroll 保持一致，
+  // 避免因 4px 阈值过紧导致流式输出时 isUserScrolling 被错误设为 true，
+  // 从而阻止自动滚动到底部。
+  const atBottom = checkIsAtBottom(wrapRef)
   isAtBottom.value = atBottom
   isUserScrolling.value = !atBottom
 }

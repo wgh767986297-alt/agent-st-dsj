@@ -345,8 +345,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const saveConversationSnapshot = async (
-    _historyId: string,
-    _user: string,
+    historyId: string,
+    user: string,
     messageList: Message[],
   ) => {
     if (messageList.length === 0) return
@@ -673,12 +673,16 @@ export const useChatStore = defineStore('chat', () => {
     currentRequestType.value = 'normal'
   }
 
-  // 刷新历史列表
-  const refreshHistoryList = async () => {
+  // 历史列表加载追踪
+  const historyTotalLoaded = ref(0)
+  const historyHasMore = ref(false)
+
+  // 刷新历史列表（默认加载10条）
+  const refreshHistoryList = async (limit = 10) => {
     isLoading.value = true
     isHistoryRefreshing.value = true
     try {
-      const list = await getConversationList({ limit: 20 })
+      const list = await getConversationList({ limit })
       historyList.value = list.map((item: any) => {
         const ts = item.updatedAt ? new Date(item.updatedAt) : new Date()
         const month = String(ts.getMonth() + 1).padStart(2, '0')
@@ -694,11 +698,48 @@ export const useChatStore = defineStore('chat', () => {
           messageCount: item.messages?.length || 0,
         }
       })
+      historyTotalLoaded.value = list.length
+      // 返回数量等于请求 limit，说明可能还有更多
+      historyHasMore.value = list.length >= limit
     } catch (err) {
       historyList.value = []
+      historyTotalLoaded.value = 0
+      historyHasMore.value = false
     } finally {
       isLoading.value = false
       isHistoryRefreshing.value = false
+    }
+  }
+
+  // 加载更多历史记录（在当前基础上多加载20条）
+  const loadMoreHistory = async () => {
+    const prevCount = historyList.value.length
+    const newLimit = prevCount + 20
+    isLoading.value = true
+    try {
+      const list = await getConversationList({ limit: newLimit })
+      historyList.value = list.map((item: any) => {
+        const ts = item.updatedAt ? new Date(item.updatedAt) : new Date()
+        const month = String(ts.getMonth() + 1).padStart(2, '0')
+        const day = String(ts.getDate()).padStart(2, '0')
+        const hours = String(ts.getHours()).padStart(2, '0')
+        const minutes = String(ts.getMinutes()).padStart(2, '0')
+        const formattedDate = `${month}月${day}日 ${hours}:${minutes}`
+        return {
+          id: item.id,
+          title: item.title,
+          date: item.displayTime || formattedDate,
+          user: item.user,
+          messageCount: item.messages?.length || 0,
+        }
+      })
+      historyTotalLoaded.value = list.length
+      // 只要返回数量比之前多了，说明可能还有更多
+      historyHasMore.value = list.length > prevCount
+    } catch (err) {
+      // 加载更多失败时保持现有列表
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -883,7 +924,10 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     saveAndClearMessages,
     autoSaveConversation,
+    historyTotalLoaded,
+    historyHasMore,
     refreshHistoryList,
+    loadMoreHistory,
     loadHistory,
     createNewChat,
     clearMessages,

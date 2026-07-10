@@ -68,6 +68,7 @@ const handleConfirm = () => {
 
 const handleCancel = () => {
   emit('cancel')
+  emit('update:visible', false)
 }
 
 const handleOverlayClick = (e: MouseEvent) => {

@@ -76,6 +76,7 @@ export interface UpdateOfficerPayload {
   officer_name?: string
   description?: string
   avatar_url?: string
+  config?: Record<string, unknown>
   /** Skill ID 列表，逗号分隔，如 "101,102,103" */
   skill_ids?: string
   /** MCP ID 列表，逗号分隔，如 "201,202" */
