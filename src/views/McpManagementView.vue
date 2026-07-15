@@ -1,528 +1,603 @@
 <template>
   <div class="ds-page-wrapper ds-page" :class="{ 'ds-page--embedded': isEmbedded }">
     <div class="ds-page-container">
-    <!-- ==================== 页面标题 ==================== -->
-    <div class="ds-page-title-row">
-      <h1 class="ds-page-title">MCP服务专区</h1>
-    </div>
-    <p class="ds-page-desc">
-      MCP（Model Context Protocol）服务专区。普通用户可将MCP服务注册到【我的MCP服务】直接使用；若需发布上架到【通用MCP服务】供全员使用，须经部门管理员审核 + 超级管理员审核（二级审核）通过后上架。上架后由管理员分配授权，下架后用户可自行删除。
-    </p>
+      <!-- ==================== 页面标题 ==================== -->
+      <div class="ds-page-title-row">
+        <h1 class="ds-page-title">MCP服务专区</h1>
+      </div>
+      <p class="ds-page-desc">
+        MCP（Model Context
+        Protocol）服务专区。普通用户可将MCP服务注册到【我的MCP服务】直接使用；若需发布上架到【通用MCP服务】供全员使用，须经部门管理员审核
+        + 超级管理员审核（二级审核）通过后上架。上架后由管理员分配授权，下架后用户可自行删除。
+      </p>
 
-    <!-- ==================== 分区标签 ==================== -->
-    <div class="ds-section-tabs">
-      <button
-        class="ds-section-tab"
-        :class="{ active: activeTab === 'mine' }"
-        @click="activeTab = 'mine'"
-      >
-        我的MCP服务<span class="count">({{ mineTotal }})</span>
-      </button>
-      <button
-        class="ds-section-tab"
-        :class="{ active: activeTab === 'general' }"
-        @click="activeTab = 'general'"
-      >
-        通用MCP服务<span class="count">({{ generalTotal }})</span>
-      </button>
-    </div>
-
-    <!-- ==================== 我的MCP服务 ==================== -->
-    <div class="ds-section-panel" v-show="activeTab === 'mine'">
-      <div class="ds-section-head">
-        <h3>
-          我的MCP服务
-          <span class="ds-section-subtitle">本部门/本人注册并可直接使用的MCP服务</span>
-        </h3>
-        <button class="ds-btn-primary" @click="openCreateDialog">
-          <el-icon :size="14"><Plus /></el-icon>
-          注册MCP服务
+      <!-- ==================== 分区标签 ==================== -->
+      <div class="ds-section-tabs">
+        <button
+          class="ds-section-tab"
+          :class="{ active: activeTab === 'mine' }"
+          @click="activeTab = 'mine'"
+        >
+          我的MCP服务<span class="count">({{ mineTotal }})</span>
+        </button>
+        <button
+          class="ds-section-tab"
+          :class="{ active: activeTab === 'general' }"
+          @click="activeTab = 'general'"
+        >
+          通用MCP服务<span class="count">({{ generalTotal }})</span>
         </button>
       </div>
-      <div class="ds-toolbar">
-        <el-select v-model="currentCategory" style="width: 140px" clearable placeholder="全部分类" @change="handleSearch">
-          <el-option
-            v-for="cat in categoryOptions"
-            :key="cat.value"
-            :label="cat.label"
-            :value="cat.value"
-          />
-        </el-select>
-        <SearchInput
-          v-model="searchQuery"
-          placeholder="搜索我的MCP服务..."
-          @search="handleSearch"
-        />
-      </div>
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="ds-card-grid">
-        <div v-for="n in 6" :key="n" class="ds-card mcp-skeleton-card">
-          <div class="mcp-skeleton-icon"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--name"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--desc"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--tag"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--short"></div>
-        </div>
-      </div>
-
-      <!-- 错误状态 -->
-      <div v-else-if="loadError" class="ds-empty">
-        <el-icon :size="48"><Warning /></el-icon>
-        <p style="margin-top:12px;">加载失败：{{ loadError }}</p>
-        <button class="ds-btn-outline" style="margin-top:16px;" @click="refreshList">重试</button>
-      </div>
-
-      <!-- 卡片网格 -->
-      <div v-else-if="mineItems.length > 0" class="ds-card-grid">
-        <div
-          v-for="item in mineItems"
-          :key="item.id"
-          class="ds-card ds-card--clickable"
-          role="article"
-          :aria-label="item.service_name"
-          @click="openDetail(item)"
-        >
-          <div
-            class="ds-card-icon"
-            :style="{ background: categoryIconStyle(item.service_type).bg, color: categoryIconStyle(item.service_type).color }"
-          >
-            {{ getInitial(item.service_name) }}
-          </div>
-          <div class="ds-card-name">{{ item.service_name }}</div>
-          <div class="ds-card-desc">{{ item.description || '暂无描述' }}</div>
-          <div class="ds-card-tags">
-            <span class="ds-card-tag ds-card-tag--category">{{ categoryLabel(item.service_type) }}</span>
-            <span class="ds-card-tag ds-card-tag--mcp">MCP</span>
-          </div>
-          <div class="ds-card-status">
-            <span v-if="getStatus(item) !== '00'" :class="auditStatusClass(item)">{{ auditStatusText(item) }}</span>
-          </div>
-          <div v-if="hasMineMcpActions(item)" class="ds-card-actions">
-            <button v-if="getMineButtonVis(item).showPublish" class="ds-btn-mini-primary" @click.stop="applyPublishMCP(item)" aria-label="申请上架">
-              申请上架
-            </button>
-            <button v-if="getMineButtonVis(item).showUnpublish" class="ds-btn-mini-primary" @click.stop="applyUnpublishMCP(item)" aria-label="申请下架">
-              申请下架
-            </button>
-            <button v-if="getMineButtonVis(item).showEdit" class="ds-btn-mini-outline" @click.stop="openEditDialog(item)" aria-label="编辑">
-              <el-icon :size="12"><Edit /></el-icon>
-              编辑
-            </button>
-            <button v-if="getMineButtonVis(item).showDelete" class="ds-btn-mini-danger" @click.stop="confirmDeleteMCP(item)" aria-label="删除">
-              <el-icon :size="12"><Delete /></el-icon>
-              删除
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="ds-empty">
-        <el-icon :size="48"><Box /></el-icon>
-        <p style="margin-top:12px;">
-          {{ searchQuery || currentCategory ? '没有找到匹配的 MCP 服务' : '暂无 MCP 服务，点击上方按钮注册' }}
-        </p>
-      </div>
-    </div>
-
-    <!-- ==================== 通用MCP服务 ==================== -->
-    <div class="ds-section-panel" v-show="activeTab === 'general'">
-      <div class="ds-section-head">
-        <h3>
-          通用MCP服务
-          <span class="ds-section-subtitle">平台统一上架，由管理员分配授权</span>
-        </h3>
-      </div>
-      <div class="ds-toolbar">
-        <el-select v-model="currentCategory" style="width: 140px" clearable placeholder="全部分类" @change="handleSearch">
-          <el-option
-            v-for="cat in categoryOptions"
-            :key="cat.value"
-            :label="cat.label"
-            :value="cat.value"
-          />
-        </el-select>
-        <SearchInput
-          v-model="searchQuery"
-          placeholder="搜索通用MCP服务..."
-          @search="handleSearch"
-        />
-      </div>
-
-      <!-- 加载状态 -->
-      <div v-if="loading" class="ds-card-grid">
-        <div v-for="n in 6" :key="n" class="ds-card mcp-skeleton-card">
-          <div class="mcp-skeleton-icon"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--name"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--desc"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--tag"></div>
-          <div class="mcp-skeleton-line mcp-skeleton-line--short"></div>
-        </div>
-      </div>
-
-      <!-- 错误状态 -->
-      <div v-else-if="loadError" class="ds-empty">
-        <el-icon :size="48"><Warning /></el-icon>
-        <p style="margin-top:12px;">加载失败：{{ loadError }}</p>
-        <button class="ds-btn-outline" style="margin-top:16px;" @click="refreshList">重试</button>
-      </div>
-
-      <!-- 卡片网格 -->
-      <div v-else-if="generalItems.length > 0" class="ds-card-grid">
-        <div
-          v-for="item in generalItems"
-          :key="item.resource_id"
-          class="ds-card ds-card--clickable"
-          role="article"
-          :aria-label="item.resource_name"
-          @click="openGeneralDetail(item)"
-        >
-          <div
-            class="ds-card-icon"
-            :style="{ background: categoryIconStyle().bg, color: categoryIconStyle().color }"
-          >
-            {{ getInitial(item.resource_name) }}
-          </div>
-          <div class="ds-card-name">{{ item.resource_name }}</div>
-          <div class="ds-card-desc">{{ item.description || '暂无描述' }}</div>
-          <div class="ds-card-tags">
-            <span class="ds-card-tag ds-card-tag--category">MCP</span>
-            <span class="ds-card-tag ds-card-tag--mcp">已上架</span>
-          </div>
-          <div class="ds-card-status">
-            <span class="ds-tag-approved">已上架</span>
-          </div>
-          <div v-if="item.creator_name || item.dept_name" style="font-size:11px;color:var(--ds-text-secondary);margin-top:4px;">
-            创建者：{{ item.creator_name || '—' }} | 部门：{{ item.dept_name || '—' }}
-          </div>
-          <div v-if="isManager" class="ds-card-actions">
-            <button v-if="isManager" class="ds-btn-mini-primary" @click.stop="openGeneralMcpAuthDialog(item)">授权</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="ds-empty">
-        <el-icon :size="48"><Box /></el-icon>
-        <p style="margin-top:12px;">
-          {{ searchQuery || currentCategory ? '没有找到匹配的 MCP 服务' : '暂无已上架的通用 MCP 服务' }}
-        </p>
-      </div>
-    </div>
-
-    <!-- ==================== 创建/编辑对话框 ==================== -->
-    <Teleport to="body">
-      <transition name="ds-modal-fade">
-        <div
-          v-if="dialogVisible"
-          class="ds-modal-overlay"
-        >
-          <div class="ds-modal-box" role="dialog" aria-modal="true" :aria-label="dialogTitle">
-            <div class="ds-modal-header">
-              <h2 class="ds-modal-title">{{ dialogTitle }}</h2>
-              <button class="ds-modal-close" type="button" aria-label="关闭" @click="closeDialog">
-                <el-icon :size="16"><Close /></el-icon>
-              </button>
-            </div>
-
-            <div class="ds-modal-body">
-              <!-- 1. 服务名称 * -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">
-                  服务名称 <span class="ds-required">*</span>
-                </label>
-                <input
-                  type="text"
-                  v-model="formData.service_name"
-                  placeholder="例如：出入境记录查询服务"
-                  maxlength="60"
-                />
-              </div>
-
-              <!-- 2. 服务编码 * -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">
-                  服务编码 <span class="ds-required">*</span>
-                </label>
-                <input
-                  type="text"
-                  v-model="formData.service_code"
-                  placeholder="例如：mcp_crj_query"
-                  maxlength="50"
-                  :disabled="isEditing"
-                />
-                <span v-if="!isEditing" style="font-size:11px;color:var(--ds-text-secondary);margin-top:4px;display:block;">
-                  唯一标识，创建后不可修改。建议使用英文+下划线
-                </span>
-              </div>
-
-              <!-- 3. 服务分类 * -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">
-                  服务分类 <span class="ds-required">*</span>
-                </label>
-                <el-select
-                  v-model="formData.service_type"
-                  placeholder="请选择分类"
-                  style="width: 100%"
-                >
-                  <el-option
-                    v-for="cat in serviceTypeOptions"
-                    :key="cat.value"
-                    :label="cat.label"
-                    :value="cat.value"
-                  />
-                </el-select>
-              </div>
-
-              <!-- 4. MCP服务端地址 * -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">
-                  MCP服务端地址 <span class="ds-required">*</span>
-                </label>
-                <input
-                  type="text"
-                  v-model="formData.service_url"
-                  placeholder="例如：https://mcp.example.com/huzheng/v1"
-                />
-              </div>
-
-              <!-- 5. API 密钥 -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">API 密钥</label>
-                <input
-                  type="text"
-                  v-model="formData.api_key"
-                  placeholder="可选，认证密钥"
-                />
-              </div>
-
-              <!-- 6. 服务描述 * -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">
-                  服务描述 <span class="ds-required">*</span>
-                </label>
-                <textarea
-                  v-model="formData.description"
-                  placeholder="请描述该MCP服务的功能、支持的操作及数据范围"
-                  rows="3"
-                  maxlength="500"
-                ></textarea>
-              </div>
-
-              <!-- 7. 协议类型 -->
-              <div class="ds-form-group">
-                <label class="ds-form-label">协议类型</label>
-                <el-select
-                  v-model="formData.protocol_type"
-                  style="width: 100%"
-                >
-                  <el-option label="Streamable HTTP" value="streamableHttp" />
-                  <el-option label="SSE (Server-Sent Events)" value="sse" />
-                </el-select>
-              </div>
-
-              <!-- 8. 申请说明（仅创建时） -->
-              <div v-if="!isEditing" class="ds-form-group">
-                <label class="ds-form-label">申请说明</label>
-                <textarea
-                  v-model="formData.reason"
-                  placeholder="请说明注册该服务的业务用途"
-                  rows="2"
-                  maxlength="300"
-                ></textarea>
-              </div>
-            </div>
-
-            <div class="ds-modal-footer">
-              <button class="ds-btn-cancel" @click="closeDialog">取消</button>
-              <button class="ds-btn-confirm" :disabled="submitting" @click="submitForm">
-                {{ submitting ? '提交中...' : (isEditing ? '保存修改' : '注册MCP服务') }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- ==================== 详情对话框 ==================== -->
-    <Teleport to="body">
-      <transition name="ds-modal-fade">
-        <div
-          v-if="detailVisible"
-          class="ds-modal-overlay"
-        >
-          <div
-            class="ds-modal-box"
-            role="dialog"
-            aria-modal="true"
-            aria-label="MCP 服务详情"
-          >
-            <div class="ds-modal-header">
-              <h2 class="ds-modal-title">{{ detailItem?.service_name }}</h2>
-              <button
-                class="ds-modal-close"
-                type="button"
-                aria-label="关闭"
-                @click="detailVisible = false"
-              >
-                <el-icon :size="16"><Close /></el-icon>
-              </button>
-            </div>
-
-            <div v-if="detailItem" class="ds-modal-body">
-              <div class="ds-form-group">
-                <label class="ds-form-label">服务编码</label>
-                <div style="font-size:13px;color:var(--ds-text);font-family:var(--ds-font-mono);word-break:break-all;padding:8px 0;">
-                  {{ detailItem.service_code }}
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">服务地址</label>
-                <div style="font-size:13px;color:var(--ds-text);font-family:var(--ds-font-mono);word-break:break-all;padding:8px 0;">
-                  {{ detailItem.service_url }}
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">协议类型</label>
-                <div style="padding:8px 0;">
-                  <span class="ds-card-tag ds-card-tag--category">{{ detailItem.protocol_type || 'streamableHttp' }}</span>
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">服务分类</label>
-                <div style="padding:8px 0;">
-                  <span class="ds-card-tag ds-card-tag--category">{{ categoryLabel(detailItem.service_type) }}</span>
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">审核状态</label>
-                <div style="padding:8px 0;">
-                  <span v-if="getStatus(detailItem) !== '00'" :class="auditStatusClass(detailItem)">{{ auditStatusText(detailItem) }}</span>
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">工具数量</label>
-                <div style="font-size:13px;color:var(--ds-text);padding:8px 0;">
-                  {{ detailItem.tools_count ?? (detailItem.tools?.length ?? '—') }}
-                </div>
-              </div>
-              <div class="ds-form-group">
-                <label class="ds-form-label">描述</label>
-                <p style="font-size:13px;color:var(--ds-text);line-height:1.7;white-space:pre-wrap;margin:8px 0 0;">
-                  {{ detailItem.description || '暂无描述' }}
-                </p>
-              </div>
-
-              <!-- 工具列表 -->
-              <div v-if="detailItem.tools && detailItem.tools.length > 0" class="ds-form-group">
-                <label class="ds-form-label">工具列表</label>
-                <div class="mcp-tools-list">
-                  <details
-                    v-for="(tool, idx) in detailItem.tools"
-                    :key="idx"
-                    class="mcp-tool-item"
-                    :open="detailItem.tools.length === 1"
-                  >
-                    <summary class="mcp-tool-summary">
-                      <span class="mcp-tool-name">{{ tool.name }}</span>
-                      <span class="mcp-tool-desc">{{ tool.description || '暂无描述' }}</span>
-                    </summary>
-                    <div class="mcp-tool-schema">
-                      <pre>{{ JSON.stringify(tool.inputSchema, null, 2) }}</pre>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </div>
-
-            <div class="ds-modal-footer">
-              <button class="ds-btn-cancel" @click="detailVisible = false">关闭</button>
-              <button
-                v-if="isOwner(detailItem)"
-                class="ds-btn-confirm"
-                @click="detailVisible = false; openEditDialog(detailItem!)"
-              >
-                <el-icon :size="14"><Edit /></el-icon>
-                编辑
-              </button>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
-
-    <!-- ==================== 通用授权弹窗 ==================== -->
-    <el-dialog
-      v-model="generalMcpAuthDialogVisible"
-      width="480px"
-      :close-on-click-modal="false"
-      destroy-on-close
-      align-center
-      class="ds-modal"
-    >
-      <template #header>
-        <h2 class="ds-modal-title">授权 - {{ generalMcpAuthTarget?.resource_name || '' }}</h2>
-      </template>
-
-      <div class="ds-modal-body">
-        <!-- 超管：部门-人员联动选择 -->
-        <div v-if="isSuperAdmin" class="ds-form-group">
-          <label class="ds-form-label">选择部门</label>
-          <el-select
-            v-model="generalMcpAuthDeptId"
-            placeholder="全部部门"
-            style="width:100%;margin-bottom:16px"
-            clearable
-            @change="generalMcpAuthUserId = null"
-          >
-            <el-option v-for="d in deptList" :key="d.id" :label="d.dept_name" :value="d.id" />
-          </el-select>
-        </div>
-        <div class="ds-form-group">
-          <label class="ds-form-label">选择用户</label>
-          <p v-if="!isSuperAdmin" style="font-size:12px;color:var(--ds-text-subtle);margin:0 0 6px;">仅显示本部门用户</p>
-          <el-select
-            v-model="generalMcpAuthUserId"
-            placeholder="请选择要授权的用户"
-            style="width:100%"
-            :loading="generalMcpAuthUsersLoading"
-          >
-            <el-option
-              v-for="u in filteredGeneralMcpAuthUsers"
-              :key="u.id"
-              :label="`${u.name || ''} (${u.idCard || u.phone || u.id || ''})`"
-              :value="Number(u.id)"
-            />
-          </el-select>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <button class="ds-btn-cancel" @click="generalMcpAuthDialogVisible = false">取消</button>
-          <button class="ds-btn-confirm" :disabled="generalMcpAuthGranting" @click="doGeneralMcpAuth">
-            {{ generalMcpAuthGranting ? '授权中...' : '确认授权' }}
+      <!-- ==================== 我的MCP服务 ==================== -->
+      <div class="ds-section-panel" v-show="activeTab === 'mine'">
+        <div class="ds-section-head">
+          <h3>
+            我的MCP服务
+            <span class="ds-section-subtitle">本部门/本人注册并可直接使用的MCP服务</span>
+          </h3>
+          <button class="ds-btn-primary" @click="openCreateDialog">
+            <el-icon :size="14"><Plus /></el-icon>
+            注册MCP服务
           </button>
         </div>
-      </template>
-    </el-dialog>
-    </div><!-- .ds-page-container -->
+        <div class="ds-toolbar">
+          <el-select
+            v-model="currentCategory"
+            style="width: 140px"
+            clearable
+            placeholder="全部分类"
+            @change="handleSearch"
+          >
+            <el-option
+              v-for="cat in categoryOptions"
+              :key="cat.value"
+              :label="cat.label"
+              :value="cat.value"
+            />
+          </el-select>
+          <SearchInput
+            v-model="searchQuery"
+            placeholder="搜索我的MCP服务..."
+            @search="handleSearch"
+          />
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="loading" class="ds-card-grid">
+          <div v-for="n in 6" :key="n" class="ds-card mcp-skeleton-card">
+            <div class="mcp-skeleton-icon"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--name"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--desc"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--tag"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--short"></div>
+          </div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div v-else-if="loadError" class="ds-empty">
+          <el-icon :size="48"><Warning /></el-icon>
+          <p style="margin-top: 12px">加载失败：{{ loadError }}</p>
+          <button class="ds-btn-outline" style="margin-top: 16px" @click="refreshList">重试</button>
+        </div>
+
+        <!-- 卡片网格 -->
+        <div v-else-if="mineItems.length > 0" class="ds-card-grid">
+          <div
+            v-for="item in mineItems"
+            :key="item.id"
+            class="ds-card ds-card--clickable"
+            role="article"
+            :aria-label="item.service_name"
+            @click="openDetail(item)"
+          >
+            <div
+              class="ds-card-icon"
+              :style="{
+                background: categoryIconStyle(item.service_type).bg,
+                color: categoryIconStyle(item.service_type).color,
+              }"
+            >
+              {{ getInitial(item.service_name) }}
+            </div>
+            <div class="ds-card-name">{{ item.service_name }}</div>
+            <div class="ds-card-desc">{{ item.description || '暂无描述' }}</div>
+            <div class="ds-card-tags">
+              <span class="ds-card-tag ds-card-tag--category">{{
+                categoryLabel(item.service_type)
+              }}</span>
+              <span class="ds-card-tag ds-card-tag--mcp">MCP</span>
+            </div>
+            <div class="ds-card-status">
+              <span v-if="getStatus(item) !== '00'" :class="auditStatusClass(item)">{{
+                auditStatusText(item)
+              }}</span>
+            </div>
+            <div v-if="hasMineMcpActions(item)" class="ds-card-actions">
+              <button
+                v-if="getMineButtonVis(item).showPublish"
+                class="ds-btn-mini-primary"
+                @click.stop="applyPublishMCP(item)"
+                aria-label="申请上架"
+              >
+                申请上架
+              </button>
+              <button
+                v-if="getMineButtonVis(item).showUnpublish"
+                class="ds-btn-mini-primary"
+                @click.stop="applyUnpublishMCP(item)"
+                aria-label="申请下架"
+              >
+                申请下架
+              </button>
+              <button
+                v-if="getMineButtonVis(item).showEdit"
+                class="ds-btn-mini-outline"
+                @click.stop="openEditDialog(item)"
+                aria-label="编辑"
+              >
+                <el-icon :size="12"><Edit /></el-icon>
+                编辑
+              </button>
+              <button
+                v-if="getMineButtonVis(item).showDelete"
+                class="ds-btn-mini-danger"
+                @click.stop="confirmDeleteMCP(item)"
+                aria-label="删除"
+              >
+                <el-icon :size="12"><Delete /></el-icon>
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else class="ds-empty">
+          <el-icon :size="48"><Box /></el-icon>
+          <p style="margin-top: 12px">
+            {{
+              searchQuery || currentCategory
+                ? '没有找到匹配的 MCP 服务'
+                : '暂无 MCP 服务，点击上方按钮注册'
+            }}
+          </p>
+        </div>
+      </div>
+
+      <!-- ==================== 通用MCP服务 ==================== -->
+      <div class="ds-section-panel" v-show="activeTab === 'general'">
+        <div class="ds-section-head">
+          <h3>
+            通用MCP服务
+            <span class="ds-section-subtitle">平台统一上架，由管理员分配授权</span>
+          </h3>
+        </div>
+        <div class="ds-toolbar">
+          <el-select
+            v-model="currentCategory"
+            style="width: 140px"
+            clearable
+            placeholder="全部分类"
+            @change="handleSearch"
+          >
+            <el-option
+              v-for="cat in categoryOptions"
+              :key="cat.value"
+              :label="cat.label"
+              :value="cat.value"
+            />
+          </el-select>
+          <SearchInput
+            v-model="searchQuery"
+            placeholder="搜索通用MCP服务..."
+            @search="handleSearch"
+          />
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="loading" class="ds-card-grid">
+          <div v-for="n in 6" :key="n" class="ds-card mcp-skeleton-card">
+            <div class="mcp-skeleton-icon"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--name"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--desc"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--tag"></div>
+            <div class="mcp-skeleton-line mcp-skeleton-line--short"></div>
+          </div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div v-else-if="loadError" class="ds-empty">
+          <el-icon :size="48"><Warning /></el-icon>
+          <p style="margin-top: 12px">加载失败：{{ loadError }}</p>
+          <button class="ds-btn-outline" style="margin-top: 16px" @click="refreshList">重试</button>
+        </div>
+
+        <!-- 卡片网格 -->
+        <div v-else-if="generalItems.length > 0" class="ds-card-grid">
+          <div
+            v-for="item in generalItems"
+            :key="item.resource_id"
+            class="ds-card ds-card--clickable"
+            role="article"
+            :aria-label="item.resource_name"
+            @click="openGeneralDetail(item)"
+          >
+            <div
+              class="ds-card-icon"
+              :style="{ background: categoryIconStyle().bg, color: categoryIconStyle().color }"
+            >
+              {{ getInitial(item.resource_name) }}
+            </div>
+            <div class="ds-card-name">{{ item.resource_name }}</div>
+            <div class="ds-card-desc">{{ item.description || '暂无描述' }}</div>
+            <div class="ds-card-tags">
+              <span class="ds-card-tag ds-card-tag--category">MCP</span>
+              <span class="ds-card-tag ds-card-tag--mcp">已上架</span>
+            </div>
+            <div class="ds-card-status">
+              <span class="ds-tag-approved">已上架</span>
+            </div>
+            <div
+              v-if="item.creator_name || item.dept_name"
+              style="font-size: 11px; color: var(--ds-text-secondary); margin-top: 4px"
+            >
+              创建者：{{ item.creator_name || '—' }} | 部门：{{ item.dept_name || '—' }}
+            </div>
+            <div v-if="isManager" class="ds-card-actions">
+              <button
+                v-if="isManager"
+                class="ds-btn-mini-primary"
+                @click.stop="openGeneralMcpAuthDialog(item)"
+              >
+                授权
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else class="ds-empty">
+          <el-icon :size="48"><Box /></el-icon>
+          <p style="margin-top: 12px">
+            {{
+              searchQuery || currentCategory
+                ? '没有找到匹配的 MCP 服务'
+                : '暂无已上架的通用 MCP 服务'
+            }}
+          </p>
+        </div>
+      </div>
+
+      <!-- ==================== 创建/编辑对话框 ==================== -->
+      <Teleport to="body">
+        <transition name="ds-modal-fade">
+          <div v-if="dialogVisible" class="ds-modal-overlay">
+            <div class="ds-modal-box" role="dialog" aria-modal="true" :aria-label="dialogTitle">
+              <div class="ds-modal-header">
+                <h2 class="ds-modal-title">{{ dialogTitle }}</h2>
+                <button class="ds-modal-close" type="button" aria-label="关闭" @click="closeDialog">
+                  <el-icon :size="16"><Close /></el-icon>
+                </button>
+              </div>
+
+              <div class="ds-modal-body">
+                <!-- 1. 服务名称 * -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label"> 服务名称 <span class="ds-required">*</span> </label>
+                  <input
+                    type="text"
+                    v-model="formData.service_name"
+                    placeholder="例如：出入境记录查询服务"
+                    maxlength="60"
+                  />
+                </div>
+
+                <!-- 2. 服务编码 * -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label"> 服务编码 <span class="ds-required">*</span> </label>
+                  <input
+                    type="text"
+                    v-model="formData.service_code"
+                    placeholder="例如：mcp_crj_query"
+                    maxlength="50"
+                    :disabled="isEditing"
+                  />
+                  <span
+                    v-if="!isEditing"
+                    style="
+                      font-size: 11px;
+                      color: var(--ds-text-secondary);
+                      margin-top: 4px;
+                      display: block;
+                    "
+                  >
+                    唯一标识，创建后不可修改。建议使用英文+下划线
+                  </span>
+                </div>
+
+                <!-- 3. 服务分类 * -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label"> 服务分类 <span class="ds-required">*</span> </label>
+                  <el-select
+                    v-model="formData.service_type"
+                    placeholder="请选择分类"
+                    style="width: 100%"
+                  >
+                    <el-option
+                      v-for="cat in serviceTypeOptions"
+                      :key="cat.value"
+                      :label="cat.label"
+                      :value="cat.value"
+                    />
+                  </el-select>
+                </div>
+
+                <!-- 4. MCP服务端地址 * -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label">
+                    MCP服务端地址 <span class="ds-required">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    v-model="formData.service_url"
+                    placeholder="例如：https://mcp.example.com/huzheng/v1"
+                  />
+                </div>
+
+                <!-- 5. API 密钥 -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label">API 密钥</label>
+                  <input type="text" v-model="formData.api_key" placeholder="可选，认证密钥" />
+                </div>
+
+                <!-- 6. 服务描述 * -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label"> 服务描述 <span class="ds-required">*</span> </label>
+                  <textarea
+                    v-model="formData.description"
+                    placeholder="请描述该MCP服务的功能、支持的操作及数据范围"
+                    rows="3"
+                    maxlength="500"
+                  ></textarea>
+                </div>
+
+                <!-- 7. 协议类型 -->
+                <div class="ds-form-group">
+                  <label class="ds-form-label">协议类型</label>
+                  <el-select v-model="formData.protocol_type" style="width: 100%">
+                    <el-option label="Streamable HTTP" value="streamableHttp" />
+                    <el-option label="SSE (Server-Sent Events)" value="sse" />
+                  </el-select>
+                </div>
+
+                <!-- 8. 申请说明（仅创建时） -->
+                <div v-if="!isEditing" class="ds-form-group">
+                  <label class="ds-form-label">申请说明</label>
+                  <textarea
+                    v-model="formData.reason"
+                    placeholder="请说明注册该服务的业务用途"
+                    rows="2"
+                    maxlength="300"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div class="ds-modal-footer">
+                <button class="ds-btn-cancel" @click="closeDialog">取消</button>
+                <button class="ds-btn-confirm" :disabled="submitting" @click="submitForm">
+                  {{ submitting ? '提交中...' : isEditing ? '保存修改' : '注册MCP服务' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </Teleport>
+
+      <!-- ==================== 详情对话框 ==================== -->
+      <Teleport to="body">
+        <transition name="ds-modal-fade">
+          <div v-if="detailVisible" class="ds-modal-overlay">
+            <div class="ds-modal-box" role="dialog" aria-modal="true" aria-label="MCP 服务详情">
+              <div class="ds-modal-header">
+                <h2 class="ds-modal-title">{{ detailItem?.service_name }}</h2>
+                <button
+                  class="ds-modal-close"
+                  type="button"
+                  aria-label="关闭"
+                  @click="detailVisible = false"
+                >
+                  <el-icon :size="16"><Close /></el-icon>
+                </button>
+              </div>
+
+              <div v-if="detailItem" class="ds-modal-body">
+                <div class="ds-form-group">
+                  <label class="ds-form-label">服务编码</label>
+                  <div
+                    style="
+                      font-size: 13px;
+                      color: var(--ds-text);
+                      font-family: var(--ds-font-mono);
+                      word-break: break-all;
+                      padding: 8px 0;
+                    "
+                  >
+                    {{ detailItem.service_code }}
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">服务地址</label>
+                  <div
+                    style="
+                      font-size: 13px;
+                      color: var(--ds-text);
+                      font-family: var(--ds-font-mono);
+                      word-break: break-all;
+                      padding: 8px 0;
+                    "
+                  >
+                    {{ detailItem.service_url }}
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">协议类型</label>
+                  <div style="padding: 8px 0">
+                    <span class="ds-card-tag ds-card-tag--category">{{
+                      detailItem.protocol_type || 'streamableHttp'
+                    }}</span>
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">服务分类</label>
+                  <div style="padding: 8px 0">
+                    <span class="ds-card-tag ds-card-tag--category">{{
+                      categoryLabel(detailItem.service_type)
+                    }}</span>
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">审核状态</label>
+                  <div style="padding: 8px 0">
+                    <span
+                      v-if="getStatus(detailItem) !== '00'"
+                      :class="auditStatusClass(detailItem)"
+                      >{{ auditStatusText(detailItem) }}</span
+                    >
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">工具数量</label>
+                  <div style="font-size: 13px; color: var(--ds-text); padding: 8px 0">
+                    {{ detailItem.tools_count ?? detailItem.tools?.length ?? '—' }}
+                  </div>
+                </div>
+                <div class="ds-form-group">
+                  <label class="ds-form-label">描述</label>
+                  <p
+                    style="
+                      font-size: 13px;
+                      color: var(--ds-text);
+                      line-height: 1.7;
+                      white-space: pre-wrap;
+                      margin: 8px 0 0;
+                    "
+                  >
+                    {{ detailItem.description || '暂无描述' }}
+                  </p>
+                </div>
+
+                <!-- 工具列表 -->
+                <div v-if="detailItem.tools && detailItem.tools.length > 0" class="ds-form-group">
+                  <label class="ds-form-label">工具列表</label>
+                  <div class="mcp-tools-list">
+                    <details
+                      v-for="(tool, idx) in detailItem.tools"
+                      :key="idx"
+                      class="mcp-tool-item"
+                      :open="detailItem.tools.length === 1"
+                    >
+                      <summary class="mcp-tool-summary">
+                        <span class="mcp-tool-name">{{ tool.name }}</span>
+                        <span class="mcp-tool-desc">{{ tool.description || '暂无描述' }}</span>
+                      </summary>
+                      <div class="mcp-tool-schema">
+                        <pre>{{ JSON.stringify(tool.inputSchema, null, 2) }}</pre>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ds-modal-footer">
+                <button class="ds-btn-cancel" @click="detailVisible = false">关闭</button>
+                <button
+                  v-if="isOwner(detailItem)"
+                  class="ds-btn-confirm"
+                  @click="openEditFromDetail(detailItem)"
+                >
+                  <el-icon :size="14"><Edit /></el-icon>
+                  编辑
+                </button>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </Teleport>
+
+      <!-- ==================== 通用授权弹窗 ==================== -->
+      <el-dialog
+        v-model="generalMcpAuthDialogVisible"
+        width="480px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        align-center
+        class="ds-modal"
+      >
+        <template #header>
+          <h2 class="ds-modal-title">授权 - {{ generalMcpAuthTarget?.resource_name || '' }}</h2>
+        </template>
+
+        <div class="ds-modal-body">
+          <!-- 超管：部门-人员联动选择 -->
+          <div v-if="isSuperAdmin" class="ds-form-group">
+            <label class="ds-form-label">选择部门</label>
+            <el-select
+              v-model="generalMcpAuthDeptId"
+              placeholder="全部部门"
+              style="width: 100%; margin-bottom: 16px"
+              clearable
+              @change="generalMcpAuthUserId = null"
+            >
+              <el-option v-for="d in deptList" :key="d.id" :label="d.dept_name" :value="d.id" />
+            </el-select>
+          </div>
+          <div class="ds-form-group">
+            <label class="ds-form-label">选择用户</label>
+            <p
+              v-if="!isSuperAdmin"
+              style="font-size: 12px; color: var(--ds-text-subtle); margin: 0 0 6px"
+            >
+              仅显示本部门用户
+            </p>
+            <el-select
+              v-model="generalMcpAuthUserId"
+              placeholder="请选择要授权的用户"
+              style="width: 100%"
+              :loading="generalMcpAuthUsersLoading"
+            >
+              <el-option
+                v-for="u in filteredGeneralMcpAuthUsers"
+                :key="u.id"
+                :label="`${u.name || ''} (${u.idCard || u.phone || u.id || ''})`"
+                :value="Number(u.id)"
+              />
+            </el-select>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer">
+            <button class="ds-btn-cancel" @click="generalMcpAuthDialogVisible = false">取消</button>
+            <button
+              class="ds-btn-confirm"
+              :disabled="generalMcpAuthGranting"
+              @click="doGeneralMcpAuth"
+            >
+              {{ generalMcpAuthGranting ? '授权中...' : '确认授权' }}
+            </button>
+          </div>
+        </template>
+      </el-dialog>
+    </div>
+    <!-- .ds-page-container -->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  Plus,
-  Edit,
-  Delete,
-  Box,
-  Close,
-  Warning,
-} from '@element-plus/icons-vue'
+import { Plus, Edit, Delete, Box, Close, Warning } from '@element-plus/icons-vue'
 import {
   applyPublishMcp,
   applyRemoveMcp,
@@ -532,11 +607,22 @@ import {
   type McpServiceItem,
   type McpCreateOrUpdateParams,
 } from '@/api/mcpService'
-import { getMyResources, getPublicResources, type MyMcpItem, type PublicResourceItem } from '@/api/resource'
+import {
+  getMyResources,
+  getPublicResources,
+  type MyMcpItem,
+  type PublicResourceItem,
+} from '@/api/resource'
 import { authManageApi } from '@/api/authManage'
 import { userAuditApi, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
-import { getStoredUserProfile, getCurrentUserId, getCurrentDeptId, isAdminAccount, isDepartmentAdmin } from '@/utils/auth'
+import {
+  getStoredUserProfile,
+  getCurrentUserId,
+  getCurrentDeptId,
+  isAdminAccount,
+  isDepartmentAdmin,
+} from '@/utils/auth'
 import {
   getStatus,
   getButtonVisibility,
@@ -615,7 +701,7 @@ function hasMineMcpActions(item: McpServiceItem & { _source?: string }): boolean
   return vis.showPublish || vis.showUnpublish || vis.showEdit || vis.showDelete
 }
 
-function isOwner(item: McpServiceItem & { _source?: string } | null): boolean {
+function isOwner(item: (McpServiceItem & { _source?: string }) | null): boolean {
   if (!item) return false
   return activeTab.value === 'mine' && item._source !== 'authorized'
 }
@@ -783,6 +869,11 @@ function openCreateDialog() {
   dialogVisible.value = true
 }
 
+function openEditFromDetail(item: McpServiceItem) {
+  detailVisible.value = false
+  openEditDialog(item)
+}
+
 function openEditDialog(item: McpServiceItem) {
   isEditing.value = true
   editingId.value = item.id
@@ -841,7 +932,9 @@ async function submitForm() {
     const result = await createOrUpdateMcp(payload)
     ElMessage.success(
       result.message ||
-        (isEditing.value ? `MCP 服务「${formData.value.service_name.trim()}」已更新` : `MCP 服务创建成功`),
+        (isEditing.value
+          ? `MCP 服务「${formData.value.service_name.trim()}」已更新`
+          : `MCP 服务创建成功`),
     )
     closeDialog()
     await loadData()
@@ -892,7 +985,11 @@ const generalMcpAuthDeptId = ref<number | null>(null)
 const deptList = ref<Department[]>([])
 
 async function loadDeptList() {
-  try { deptList.value = await departmentApi.list() } catch { deptList.value = [] }
+  try {
+    deptList.value = await departmentApi.list()
+  } catch {
+    deptList.value = []
+  }
 }
 
 async function openGeneralMcpAuthDialog(item: PublicResourceItem) {
@@ -914,14 +1011,14 @@ async function openGeneralMcpAuthDialog(item: PublicResourceItem) {
 const filteredGeneralMcpAuthUsers = computed(() => {
   if (isSuperAdmin.value) {
     if (!generalMcpAuthDeptId.value) return generalMcpAuthUsers.value
-    return generalMcpAuthUsers.value.filter(u => u.dept_id === generalMcpAuthDeptId.value)
+    return generalMcpAuthUsers.value.filter((u) => u.dept_id === generalMcpAuthDeptId.value)
   }
   const profile = getStoredUserProfile()
   const myDeptId = profile?.dept_id
-  if (myDeptId) return generalMcpAuthUsers.value.filter(u => u.dept_id === myDeptId)
+  if (myDeptId) return generalMcpAuthUsers.value.filter((u) => u.dept_id === myDeptId)
   const myDept = profile?.department || ''
   if (!myDept) return generalMcpAuthUsers.value
-  return generalMcpAuthUsers.value.filter(u => (u.department || '') === myDept)
+  return generalMcpAuthUsers.value.filter((u) => (u.department || '') === myDept)
 })
 
 async function doGeneralMcpAuth() {
@@ -931,7 +1028,9 @@ async function doGeneralMcpAuth() {
   }
   generalMcpAuthGranting.value = true
   try {
-    const selectedUser = generalMcpAuthUsers.value.find(u => Number(u.id) === generalMcpAuthUserId.value)
+    const selectedUser = generalMcpAuthUsers.value.find(
+      (u) => Number(u.id) === generalMcpAuthUserId.value,
+    )
     await authManageApi.grant({
       auth_target_type: 'user',
       user_id: generalMcpAuthUserId.value,
@@ -1070,7 +1169,9 @@ onMounted(() => {
 /* ==================== 可点击卡片 ==================== */
 .ds-card--clickable {
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .ds-card--clickable:hover {

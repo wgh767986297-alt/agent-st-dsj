@@ -156,7 +156,7 @@
     </main>
 
     <!-- 审核通过后管理对话框 -->
-    <el-dialog v-model="manageDialogVisible" title="用户管理" width="500px" :close-on-click-modal="false" destroy-on-close class="ds-modal">
+    <el-dialog v-model="manageDialogVisible" title="用户管理" width="500px" align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <div v-if="manageTarget" class="manage-dialog">
         <div class="manage-dialog__user">
           <strong>{{ manageTarget.name }}</strong>

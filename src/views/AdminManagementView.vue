@@ -1402,6 +1402,7 @@ onMounted(() => {
       v-model="deptDialogVisible"
       :title="deptDialogTitle"
       width="680px"
+      align-center
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       destroy-on-close
@@ -1458,6 +1459,7 @@ onMounted(() => {
       v-model="memberManageDialogVisible"
       :title="`部门成员管理 — ${memberManageDeptName}`"
       width="720px"
+      align-center
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       destroy-on-close
@@ -1509,6 +1511,7 @@ onMounted(() => {
       v-model="memberAddDialogVisible"
       title="添加成员"
       width="520px"
+      align-center
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       destroy-on-close
@@ -1571,6 +1574,7 @@ onMounted(() => {
       v-model="memberEditDialogVisible"
       title="修改成员信息"
       width="520px"
+      align-center
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       destroy-on-close
@@ -1629,6 +1633,7 @@ onMounted(() => {
       v-model="modelDialogVisible"
       :title="modelDialogMode === 'create' ? '新增模型' : '编辑模型'"
       width="620px"
+      align-center
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       destroy-on-close

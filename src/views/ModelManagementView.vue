@@ -96,6 +96,7 @@
       v-model="dialogVisible"
       :title="dialogMode === 'create' ? '新增模型' : '编辑模型'"
       width="620px"
+      align-center
       destroy-on-close
       class="ds-modal model-dialog"
     >

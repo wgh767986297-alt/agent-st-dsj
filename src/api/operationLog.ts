@@ -1,4 +1,4 @@
-import { getAuthToken, getCurrentUserId, getCurrentDeptId, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
+import { getAuthToken, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
 
 type ApiStatus = 'success' | 'succeed' | 'error' | string
 
@@ -39,19 +39,6 @@ const BASE_URL =
 
 const buildUrl = (path: string) => `${BASE_URL}${path}`
 
-function enrichBody(body: Record<string, unknown>): Record<string, unknown> {
-  const userId = getCurrentUserId()
-  const deptId = getCurrentDeptId()
-  const enriched = { ...body }
-  if (userId != null && !('user_id' in enriched)) {
-    enriched.user_id = userId
-  }
-  if (deptId != null && !('dept_id' in enriched)) {
-    enriched.dept_id = deptId
-  }
-  return enriched
-}
-
 async function postApi<T extends BaseResponse>(path: string, body: object): Promise<T> {
   const token = getAuthToken()
 
@@ -66,7 +53,7 @@ async function postApi<T extends BaseResponse>(path: string, body: object): Prom
       'Content-Type': 'application/json',
       token,
     },
-    body: JSON.stringify(enrichBody(body as Record<string, unknown>)),
+    body: JSON.stringify(body),
   })
 
   const text = await response.text()
@@ -118,7 +105,7 @@ export const operationLogApi = {
         'Content-Type': 'application/json',
         token,
       },
-      body: JSON.stringify(enrichBody(params as Record<string, unknown>)),
+      body: JSON.stringify(params),
     })
 
     if (!response.ok) {

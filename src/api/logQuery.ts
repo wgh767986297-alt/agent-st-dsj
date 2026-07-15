@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getAuthToken, getCurrentUserId, getCurrentDeptId, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
+import { getAuthToken, handleAuthExpired, isAuthExpiredResponse } from '@/utils/auth'
 
 export interface LoginLogItem {
   id?: string
@@ -53,18 +53,6 @@ logQueryApi.interceptors.request.use(
     const token = getAuthToken()
     if (token) {
       config.headers.token = token
-    }
-    // 自动注入当前用户 ID 和部门 ID
-    if (config.data && typeof config.data === 'object') {
-      const userId = getCurrentUserId()
-      const deptId = getCurrentDeptId()
-      const data = config.data as Record<string, unknown>
-      if (userId != null && !('user_id' in data)) {
-        data.user_id = userId
-      }
-      if (deptId != null && !('dept_id' in data)) {
-        data.dept_id = deptId
-      }
     }
     return config
   },

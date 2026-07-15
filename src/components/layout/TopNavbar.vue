@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElPopover } from 'element-plus'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { clearAuth, getStoredUserProfile, isAdminAccount, isDepartmentAdmin, isSecurityAuditor } from '@/utils/auth'
+import { useChatStore } from '@/stores/chat'
 import { auditApi } from '@/api/audit'
 import iconLogo from '@/assets/icons/chat/icon-jh.png'
 
@@ -76,14 +77,14 @@ const navMenuItems: NavMenuItem[] = [
     route: '/digital-police',
     matchPaths: ['/digital-police'],
   },
+  { id: 'admin', label: '系统管理', route: '/admin-management', matchPaths: ['/admin-management'] },
+  { id: 'log-query', label: '安全审计', route: '/log-query', matchPaths: ['/log-query'] },
   {
     id: 'my-permissions',
     label: '我的权限',
     route: '/my-permissions',
     matchPaths: ['/my-permissions'],
   },
-  { id: 'admin', label: '系统管理', route: '/admin-management', matchPaths: ['/admin-management'] },
-  { id: 'log-query', label: '安全审计', route: '/log-query', matchPaths: ['/log-query'] },
 ]
 
 // 角色菜单权限（支持多角色叠加）：
@@ -121,6 +122,18 @@ const handleBrandClick = () => {
 
 const handleLogout = async () => {
   userMenuVisible.value = false
+
+  // 重置 chat store，清除上一个用户的所有会话数据（消息、历史列表、缓存池等）
+  const chatStore = useChatStore()
+  chatStore.resetAll()
+
+  // 清除 sessionStorage（零信任登录 token 等）
+  sessionStorage.removeItem('rzzx_user_token')
+  sessionStorage.removeItem('rzzx_app_token')
+
+  // 清除用户偏好的模型选择，让新用户恢复默认模型
+  localStorage.removeItem('chat:selected_model_name')
+
   clearAuth()
   await router.replace('/login')
 }

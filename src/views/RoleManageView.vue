@@ -43,7 +43,7 @@
       <div v-else-if="!selectedUserId" class="role-empty"><p>请先选择用户以查看其角色</p></div>
     </main>
 
-    <el-dialog v-model="dialogVisible" title="分配角色" width="440px" :close-on-click-modal="false" destroy-on-close class="ds-modal">
+    <el-dialog v-model="dialogVisible" title="分配角色" width="440px" align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <el-form label-position="top">
         <el-form-item label="角色">
           <el-select v-model="assignRoleId" placeholder="选择角色" style="width:100%">

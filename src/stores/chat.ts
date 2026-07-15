@@ -567,6 +567,10 @@ export const useChatStore = defineStore('chat', () => {
         abortController: null,
         currentRequestType: 'normal',
       })
+      // ✅ 直接重置 store 的流式状态，防止用户已切换到其他对话时状态残留
+      isTyping.value = false
+      isStreaming.value = false
+      isCompleteChat.value = true
     } catch (err) {
       // ✅ 检查是否是用户主动中止的请求
       if (err instanceof Error && err.name === 'AbortError') {
@@ -577,6 +581,9 @@ export const useChatStore = defineStore('chat', () => {
           abortController: null,
           currentRequestType: 'normal',
         })
+        isTyping.value = false
+        isStreaming.value = false
+        isCompleteChat.value = true
         return
       }
 
@@ -595,6 +602,9 @@ export const useChatStore = defineStore('chat', () => {
         abortController: null,
         currentRequestType: 'normal',
       })
+      isTyping.value = false
+      isStreaming.value = false
+      isCompleteChat.value = true
     }
   }
   const autoSaveConversation = async () => {
@@ -651,6 +661,44 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     clearMessages()
+  }
+
+  // ✅ 完全重置 store（退出登录时调用，防止切换用户后残留上一个用户的数据）
+  const resetAll = () => {
+    // 中止进行中的请求
+    if (abortController.value) {
+      abortController.value.abort()
+      abortController.value = null
+    }
+
+    // 清空缓存池和输入缓存
+    chatCache.clear()
+    tempInputs.clear()
+
+    // 重置所有 ref 到初始值
+    messages.value = []
+    historyList.value = []
+    isTyping.value = false
+    isStreaming.value = false
+    streamTick.value = 0
+    isCompleteChat.value = true
+    currentHistoryId.value = null
+    isLoading.value = false
+    isHistoryRefreshing.value = false
+    error.value = null
+    abortController.value = null
+    currentRequestType.value = 'normal'
+    currentUser.value = ''
+    uploadedFiles.value = []
+    personProfile.value = null
+    isPersonProfileActive.value = false
+    sensitiveWarning.value = { visible: false, message: '', keywords: [] }
+    historyTotalLoaded.value = 0
+    historyHasMore.value = false
+
+    // 重置外部工具状态
+    resetToolCallId()
+    resetPersonProfileParser()
   }
 
   // 清空当前对话
@@ -790,6 +838,10 @@ export const useChatStore = defineStore('chat', () => {
       if (data) {
         messages.value = data.messages || []
         currentHistoryId.value = history.id
+        // ✅ 切换对话时重置流式状态，防止上一个对话的流式状态泄漏到当前历史记录
+        isTyping.value = false
+        isStreaming.value = false
+        isCompleteChat.value = true
         // 同步到缓存
         chatCache.set(history.id, {
           messages: data.messages || [],
@@ -930,6 +982,7 @@ export const useChatStore = defineStore('chat', () => {
     loadMoreHistory,
     loadHistory,
     createNewChat,
+    resetAll,
     clearMessages,
     deleteHistory,
     renameHistory,

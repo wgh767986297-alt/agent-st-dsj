@@ -20,6 +20,11 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 
 initEmojiFallbackHandler()
 initTheme()
+// 生产环境过滤 ElementPlus 的控制台警告
+if (import.meta.env.PROD) {
+  app.config.warnHandler = () => {}
+  app.config.errorHandler = () => {}
+}
 
 app.use(pinia)
 app.use(router)

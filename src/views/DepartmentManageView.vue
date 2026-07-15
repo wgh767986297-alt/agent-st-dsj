@@ -75,7 +75,7 @@
 
     <!-- ========== 成员管理对话框 ========== -->
     <el-dialog v-model="memberDialogVisible" :title="`成员管理 - ${memberDept?.dept_name || ''}`" width="700px"
-      :close-on-click-modal="false" destroy-on-close class="ds-modal">
+      align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <!-- 新增成员 -->
       <div class="member-add-row">
         <el-button type="primary" @click="openRegisterDialog">
@@ -130,7 +130,7 @@
 
     <!-- ========== 编辑成员对话框 ========== -->
     <el-dialog v-model="editMemberVisible" title="编辑成员" width="420px"
-      :close-on-click-modal="false" destroy-on-close class="ds-modal">
+      align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <el-form :model="editMemberForm" label-position="top">
         <el-form-item label="用户名">
           <el-input :model-value="editMemberForm.user_name" disabled />
@@ -149,7 +149,7 @@
 
     <!-- ========== 注册新用户对话框 ========== -->
     <el-dialog v-model="registerDialogVisible" title="新增用户" width="480px"
-      :close-on-click-modal="false" destroy-on-close class="ds-modal">
+      align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-position="top">
         <el-form-item label="姓名" prop="name">
           <el-input v-model="registerForm.name" placeholder="请输入用户姓名" maxlength="30" />
@@ -180,7 +180,7 @@
     </el-dialog>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑部门' : '创建部门'" width="520px"
-      :close-on-click-modal="false" destroy-on-close class="ds-modal">
+      align-center :close-on-click-modal="false" destroy-on-close class="ds-modal">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <div class="dept-form-row">
           <el-form-item label="部门编码" prop="dept_code">

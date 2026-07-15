@@ -1,8 +1,5 @@
 <template>
-  <div
-    class="ds-page-wrapper ds-page"
-    :class="{ 'ds-page--embedded': props.embedded }"
-  >
+  <div class="ds-page-wrapper ds-page" :class="{ 'ds-page--embedded': props.embedded }">
     <!-- 页面标题行 -->
     <div class="ds-page-title-row">
       <h1 class="ds-page-title">安全审计日志</h1>
@@ -40,7 +37,13 @@
               placeholder="用户账号"
               @keyup.enter="handleQuerySubmit"
             />
-            <el-select v-model="operationSearchType" style="width: 160px" clearable placeholder="全部操作类型" @change="handleQuerySubmit">
+            <el-select
+              v-model="operationSearchType"
+              style="width: 160px"
+              clearable
+              placeholder="全部操作类型"
+              @change="handleQuerySubmit"
+            >
               <el-option label="创建" value="CREATE" />
               <el-option label="更新" value="UPDATE" />
               <el-option label="删除" value="DELETE" />
@@ -49,7 +52,13 @@
               <el-option label="审核" value="AUDIT" />
               <el-option label="申请" value="APPLY" />
             </el-select>
-            <el-select v-model="operationSearchModule" style="width: 160px" clearable placeholder="全部操作模块" @change="handleQuerySubmit">
+            <el-select
+              v-model="operationSearchModule"
+              style="width: 160px"
+              clearable
+              placeholder="全部操作模块"
+              @change="handleQuerySubmit"
+            >
               <el-option label="部门管理" value="DEPARTMENT" />
               <el-option label="技能管理" value="SKILL" />
               <el-option label="数字警员" value="OFFICER" />
@@ -67,7 +76,12 @@
               :placeholder="searchPlaceholder"
               @keyup.enter="handleQuerySubmit"
             />
-            <el-select v-model="auditRoleFilter" style="width: 160px" clearable placeholder="全部角色">
+            <el-select
+              v-model="auditRoleFilter"
+              style="width: 160px"
+              clearable
+              placeholder="全部角色"
+            >
               <el-option label="超级管理员" value="超级管理员" />
               <el-option label="部门管理员" value="部门管理员" />
               <el-option label="普通用户" value="普通用户" />
@@ -77,7 +91,7 @@
 
           <el-date-picker
             v-model="dateRange"
-            style="width:260px;flex-shrink:0;"
+            style="max-width: 300px"
             type="daterange"
             start-placeholder="开始日期"
             end-placeholder="结束日期"
@@ -109,18 +123,18 @@
           <table class="ds-table">
             <thead>
               <tr>
-                <th style="width:170px;">时间</th>
-                <th style="width:110px;">用户</th>
-                <th style="width:100px;">角色</th>
-                <th style="width:100px;">操作类型</th>
+                <th style="width: 170px">时间</th>
+                <th style="width: 110px">用户</th>
+                <th style="width: 100px">角色</th>
+                <th style="width: 100px">操作类型</th>
                 <th>操作内容</th>
-                <th style="width:140px;">IP地址</th>
+                <th style="width: 140px">IP地址</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading" class="ds-loading-row">
-                <td colspan="6" class="ds-empty-cell" style="padding:60px 20px;">
-                  <span style="color:var(--ds-text-secondary);">日志查询中...</span>
+                <td colspan="6" class="ds-empty-cell" style="padding: 60px 20px">
+                  <span style="color: var(--ds-text-secondary)">日志查询中...</span>
                 </td>
               </tr>
               <tr v-else-if="pagedUnifiedRows.length === 0">
@@ -129,22 +143,35 @@
               <tr
                 v-for="row in pagedUnifiedRows"
                 :key="row.id"
-                @click="row.sourceType === 'conversation' ? openConversationDetailFromAudit(row) : undefined"
+                @click="
+                  row.sourceType === 'conversation'
+                    ? openConversationDetailFromAudit(row)
+                    : undefined
+                "
                 :style="row.sourceType === 'conversation' ? 'cursor:pointer;' : ''"
               >
                 <td>{{ row.time }}</td>
                 <td>{{ row.user }}</td>
                 <td>{{ row.role }}</td>
                 <td>{{ row.operationType }}</td>
-                <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.operationContent }}</td>
-                <td style="font-family:var(--ds-font-mono);font-size:12px;">{{ row.ip }}</td>
+                <td
+                  style="
+                    max-width: 320px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                >
+                  {{ row.operationContent }}
+                </td>
+                <td style="font-family: var(--ds-font-mono); font-size: 12px">{{ row.ip }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <!-- 分页 -->
-        <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px">
           <el-pagination
             v-model:current-page="currentPage"
             v-model:page-size="pageSize"
@@ -183,7 +210,8 @@
                   :key="si"
                   class="ds-sq-chip"
                   @click="askAgent(s)"
-                >{{ s }}</span>
+                  >{{ s }}</span
+                >
               </div>
             </div>
           </div>
@@ -196,7 +224,9 @@
             @keydown.enter="sendAgentMessage"
           />
           <button @click="sendAgentMessage">
-            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#fff;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #fff">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+            </svg>
           </button>
         </div>
       </div>
@@ -221,10 +251,18 @@
               <span v-if="selectedConversation.updateTimeText">
                 &middot; {{ selectedConversation.updateTimeText }}
               </span>
-              <span v-if="selectedConversation.ip"> &middot; IP {{ selectedConversation.ip }} </span>
+              <span v-if="selectedConversation.ip">
+                &middot; IP {{ selectedConversation.ip }}
+              </span>
             </p>
           </div>
-          <button class="conversation-detail__close-btn" @click="closeConversationDetail" aria-label="关闭">&times;</button>
+          <button
+            class="conversation-detail__close-btn"
+            @click="closeConversationDetail"
+            aria-label="关闭"
+          >
+            &times;
+          </button>
         </header>
         <div class="conversation-detail__body" @click="handleConversationLinkClick">
           <div v-if="!selectedConversation.messages.length" class="conversation-detail__empty">
@@ -243,7 +281,13 @@
               <div class="conversation-bubble">
                 <!-- 用户消息携带的元数据标签（气泡内顶部） -->
                 <div
-                  v-if="message.role === 'user' && (message.files.length || message.officers.length || message.mcps.length || message.skills.length)"
+                  v-if="
+                    message.role === 'user' &&
+                    (message.files.length ||
+                      message.officers.length ||
+                      message.mcps.length ||
+                      message.skills.length)
+                  "
                   class="conversation-meta-tags"
                 >
                   <span
@@ -273,7 +317,9 @@
                     class="conversation-meta-tag conversation-meta-tag--file"
                   >
                     附件: {{ file.filename }}
-                    <span v-if="file.size" class="conversation-meta-tag__size">({{ formatFileSizeForAudit(file.size) }})</span>
+                    <span v-if="file.size" class="conversation-meta-tag__size"
+                      >({{ formatFileSizeForAudit(file.size) }})</span
+                    >
                   </span>
                 </div>
 
@@ -493,11 +539,7 @@ const agentMessages = ref<AgentMessage[]>([
   {
     role: 'ai',
     text: '您好！我是安全审计智能体，可以帮您分析审计日志、排查异常操作、生成审计报告。请问有什么需要帮助的？',
-    suggestions: [
-      '今日是否有异常操作',
-      '最近7天授权变更汇总',
-      '哪些用户查询最频繁',
-    ],
+    suggestions: ['今日是否有异常操作', '最近7天授权变更汇总', '哪些用户查询最频繁'],
   },
 ])
 
@@ -510,9 +552,12 @@ function askAgent(question: string) {
   // 模拟回复
   setTimeout(() => {
     const replies: Record<string, string> = {
-      '今日是否有异常操作': '经分析今日审计日志，发现1条高风险操作：用户 zhangsan 在凌晨02:13查询了重点人员前科记录，属于非工作时间敏感查询。另有2条中风险操作记录，其余均为正常操作。建议关注该用户后续操作行为。',
-      '最近7天授权变更汇总': '最近7天共有5次授权变更：\n1. admin 为刑侦支队授权skill"人员信息核查"\n2. admin 为刑侦支队授权MCP服务"卡口数据服务"\n3. admin 取消了网安支队的skill"重点区域监控"\n4. lisi 为治安大队授权MCP服务"GIS地图服务"\n5. admin 审核通过"情报汇总分析员"上架申请',
-      '哪些用户查询最频繁': '近7天查询频次统计：\n1. zhangsan - 38次（普通用户·刑侦支队）\n2. lisi - 22次（部门管理员·刑侦支队）\n3. wangwu - 15次（部门管理员·治安大队）\n4. admin - 12次（超级管理员）\n\n其中 zhangsan 有1次凌晨异常查询，建议关注。',
+      今日是否有异常操作:
+        '经分析今日审计日志，发现1条高风险操作：用户 zhangsan 在凌晨02:13查询了重点人员前科记录，属于非工作时间敏感查询。另有2条中风险操作记录，其余均为正常操作。建议关注该用户后续操作行为。',
+      最近7天授权变更汇总:
+        '最近7天共有5次授权变更：\n1. admin 为刑侦支队授权skill"人员信息核查"\n2. admin 为刑侦支队授权MCP服务"卡口数据服务"\n3. admin 取消了网安支队的skill"重点区域监控"\n4. lisi 为治安大队授权MCP服务"GIS地图服务"\n5. admin 审核通过"情报汇总分析员"上架申请',
+      哪些用户查询最频繁:
+        '近7天查询频次统计：\n1. zhangsan - 38次（普通用户·刑侦支队）\n2. lisi - 22次（部门管理员·刑侦支队）\n3. wangwu - 15次（部门管理员·治安大队）\n4. admin - 12次（超级管理员）\n\n其中 zhangsan 有1次凌晨异常查询，建议关注。',
     }
     const reply = replies[question] || '已收到您的问题，正在分析相关审计数据，请稍候...'
     agentMessages.value.push({ role: 'ai', text: reply })
@@ -598,7 +643,6 @@ function deriveRole(account: string, sourceType: LogType, sourceData: any): stri
   return '普通用户'
 }
 
-
 function normalizeLoginToAudit(row: NormalizedLoginLog): AuditLogRow {
   return {
     id: row.id || `login-${row.logindate}`,
@@ -634,20 +678,31 @@ function normalizeConversationToAudit(row: NormalizedConversationLog): AuditLogR
 
 function normalizeOperationToAudit(row: OperationLogItem): AuditLogRow {
   const typeMap: Record<string, string> = {
-    CREATE: '创建', UPDATE: '更新', DELETE: '删除',
-    ASSIGN: '分配', AUTH: '授权', AUDIT: '审核', APPLY: '申请',
+    CREATE: '创建',
+    UPDATE: '更新',
+    DELETE: '删除',
+    ASSIGN: '分配',
+    AUTH: '授权',
+    AUDIT: '审核',
+    APPLY: '申请',
   }
   const moduleMap: Record<string, string> = {
-    DEPARTMENT: '部门管理', SKILL: '技能管理', OFFICER: '数字警员',
-    MCP: 'MCP服务', AUTH: '授权管理', USER: '用户管理', ROLE: '角色管理',
+    DEPARTMENT: '部门管理',
+    SKILL: '技能管理',
+    OFFICER: '数字警员',
+    MCP: 'MCP服务',
+    AUTH: '授权管理',
+    USER: '用户管理',
+    ROLE: '角色管理',
   }
   const opType = typeMap[row.operation_type] || row.operation_type
   const opModule = moduleMap[row.operation_module] || row.operation_module
   let content = ''
   try {
-    content = typeof row.operation_content === 'string'
-      ? row.operation_content
-      : JSON.stringify(row.operation_content)
+    content =
+      typeof row.operation_content === 'string'
+        ? row.operation_content
+        : JSON.stringify(row.operation_content)
   } catch {
     content = String(row.operation_content || '')
   }
@@ -694,7 +749,9 @@ const filteredUnifiedRows = computed(() => {
     if (keyword) {
       rows = rows.filter((r) =>
         [r.account, r.user, r.ip].some((v) =>
-          String(v || '').toLowerCase().includes(keyword),
+          String(v || '')
+            .toLowerCase()
+            .includes(keyword),
         ),
       )
     }
@@ -703,7 +760,9 @@ const filteredUnifiedRows = computed(() => {
     if (keyword) {
       rows = rows.filter((r) =>
         [r.account, r.operationContent].some((v) =>
-          String(v || '').toLowerCase().includes(keyword),
+          String(v || '')
+            .toLowerCase()
+            .includes(keyword),
         ),
       )
     }
@@ -731,7 +790,9 @@ const filteredRows = computed(() => {
     if (!isConversationTimeInRange(row)) return false
     if (!keyword) return true
     return [row.account, row.title, row.contentPreview].some((value) =>
-      String(value || '').toLowerCase().includes(keyword),
+      String(value || '')
+        .toLowerCase()
+        .includes(keyword),
     )
   })
 })
@@ -781,7 +842,9 @@ const filterLoginRows = (rows: NormalizedLoginLog[]) => {
     const matchedKeyword =
       !keyword ||
       [row.account, row.username, row.loginip].some((value) =>
-        String(value || '').toLowerCase().includes(keyword),
+        String(value || '')
+          .toLowerCase()
+          .includes(keyword),
       )
     return matchedKeyword && isTimeInRange(row.logindate)
   })
@@ -816,7 +879,8 @@ const normalizeContentBlock = (block: unknown): ConversationContentBlock | null 
   if (!block || typeof block !== 'object') return null
   const record = block as Record<string, unknown>
   const type = record.type
-  if (type !== 'text' && type !== 'thinking' && type !== 'tool_call' && type !== 'tool_result') return null
+  if (type !== 'text' && type !== 'thinking' && type !== 'tool_call' && type !== 'tool_result')
+    return null
   return {
     type,
     content: String(record.content || '').trim(),
@@ -921,10 +985,12 @@ const parseConversationMessages = (content?: string): ConversationMessage[] => {
               }))
             }
             if (raw && typeof raw === 'object') {
-              return [{
-                name: String((raw as Record<string, unknown>).name || ''),
-                category: String((raw as Record<string, unknown>).category || ''),
-              }]
+              return [
+                {
+                  name: String((raw as Record<string, unknown>).name || ''),
+                  category: String((raw as Record<string, unknown>).category || ''),
+                },
+              ]
             }
             return []
           })()
@@ -980,9 +1046,7 @@ const buildConversationPreview = (messages: ConversationMessage[]) => {
 const stripActionTags = (content: string): string => {
   if (!content) return content
   // 移除 <action cmd="...">...</action> 标签及其内容（审计日志不需要交互元素）
-  return content
-    .replace(/<action\s+[^>]*>[\s\S]*?<\/action>/g, '')
-    .replace(/\s{2,}/g, ' ')
+  return content.replace(/<action\s+[^>]*>[\s\S]*?<\/action>/g, '').replace(/\s{2,}/g, ' ')
 }
 
 const renderConversationMarkdown = (content: string) => {
@@ -995,9 +1059,32 @@ const renderConversationMarkdown = (content: string) => {
   const rendered = conversationMarkdown.render(transformed)
   return DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS: [
-      'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'span',
+      'p',
+      'br',
+      'strong',
+      'em',
+      'u',
+      's',
+      'code',
+      'pre',
+      'blockquote',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+      'ul',
+      'ol',
+      'li',
+      'table',
+      'thead',
+      'tbody',
+      'tr',
+      'th',
+      'td',
+      'a',
+      'span',
     ],
     ALLOWED_ATTR: ['href', 'title', 'class', 'target', 'rel'],
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
@@ -1203,8 +1290,13 @@ const handleConversationLinkClick = (e: MouseEvent) => {
 // ========== Operation log helpers ==========
 function getOpTypeColor(type: string) {
   const map: Record<string, string> = {
-    CREATE: 'primary', UPDATE: 'warning', DELETE: 'danger',
-    ASSIGN: 'success', AUTH: 'primary', AUDIT: 'info', APPLY: '',
+    CREATE: 'primary',
+    UPDATE: 'warning',
+    DELETE: 'danger',
+    ASSIGN: 'success',
+    AUTH: 'primary',
+    AUDIT: 'info',
+    APPLY: '',
   }
   return map[type] || 'info'
 }

@@ -8,9 +8,11 @@ import {
   ElInput,
   ElButton,
   ElMessage,
+  ElMessageBox,
   ElIcon,
   ElTooltip,
   ElPopover,
+  ElDialog,
 } from 'element-plus'
 import {
   ArrowDown,
@@ -23,6 +25,13 @@ import {
   Delete,
   Edit,
   MoreFilled,
+  FolderOpened,
+  Search,
+  View,
+  Link,
+  Download,
+  Document,
+  Loading,
 } from '@element-plus/icons-vue'
 import type { HistoryItem, Message } from '@/types/chat'
 import ActionDialog from '@/components/common/ActionDialog.vue'
@@ -39,7 +48,7 @@ import { officerApi, type OfficerItem } from '@/api/officer'
 import { getMyResources } from '@/api/resource'
 import { useScrollManager } from '@/composables/useScrollManager'
 import { useLongPress } from '@/composables/useLongPress'
-import { isAdminAccount } from '@/utils/auth'
+import { getCurrentAccount, isAdminAccount } from '@/utils/auth'
 
 defineOptions({ name: 'ChatView' })
 
@@ -47,6 +56,7 @@ import arrowBottomIcon from '@/assets/icons/chat/icon-chat-arrow-bottom.png'
 import iconNavOpen from '@/assets/icons/nav/icon-nav-open.png'
 import iconNavHistory from '@/assets/icons/nav/icon-nav-history.png'
 import iconNewChat from '@/assets/icons/nav/icon-nav-chat.png'
+import iconFileUpload from '@/assets/icons/files/icon-file-upload.png'
 import './styles/ChatView.css'
 import '@/components/layout/GroupedSidebarNav.css'
 
@@ -219,6 +229,270 @@ const messagesAreaRef = ref<HTMLDivElement | null>(null)
 const activeMessageId = ref<string | null>(null)
 const attachmentDialogVisible = ref(false)
 
+// ============ 我的产物（右侧挤压面板） ============
+import {
+  getAppendixList,
+  deleteAppendix,
+  getGeneratedHistoryList,
+  deleteGeneratedHistory,
+} from '@/api/appendixHistory'
+import { transformMinioUrl } from '@/utils/urlTransform'
+
+interface GeneratedFileItem {
+  file_id: string
+  file_name: string
+  file_url: string
+  create_time?: string
+}
+
+const myProductsVisible = ref(false)
+const myProductsLoading = ref(false)
+const myProductsTab = ref<'appendix' | 'generated'>('generated')
+const myProductsList = ref<GeneratedFileItem[]>([])
+const myProductsKeyword = ref('')
+const myProductsPage = ref(1)
+const myProductsTotal = ref(0)
+const pageSize = 10
+
+// 预览弹窗
+const myProductsPreviewVisible = ref(false)
+const myProductsPreviewItem = ref<GeneratedFileItem | null>(null)
+
+/** 判断文件类型 */
+const getMyProductFileType = (fileName: string): string => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image'
+  if (['pdf'].includes(ext)) return 'pdf'
+  if (['docx'].includes(ext)) return 'docx'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'xlsx'
+  if (['mp4', 'webm', 'ogg'].includes(ext)) return 'video'
+  if (['mp3', 'wav', 'flac', 'aac'].includes(ext)) return 'audio'
+  if (['html', 'htm', 'xhtml'].includes(ext)) return 'html'
+  if (['txt', 'md', 'markdown'].includes(ext)) return 'text'
+  if (['doc', 'ppt', 'pptx'].includes(ext)) return 'office'
+  return 'other'
+}
+
+/** 文件类型标签样式 */
+const getMyProductTagStyle = (fileName: string) => {
+  const type = getMyProductFileType(fileName)
+  const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    image: { label: '图片', color: '#166534', bg: 'rgba(22,101,52,0.08)', border: 'rgba(22,101,52,0.18)' },
+    pdf: { label: 'PDF', color: '#991b1b', bg: 'rgba(153,27,27,0.08)', border: 'rgba(153,27,27,0.18)' },
+    docx: { label: 'DOCX', color: '#1a56b8', bg: 'rgba(26,86,184,0.08)', border: 'rgba(26,86,184,0.18)' },
+    xlsx: { label: 'XLSX', color: '#0d7a3e', bg: 'rgba(13,122,62,0.08)', border: 'rgba(13,122,62,0.18)' },
+    video: { label: '视频', color: '#1e3a5f', bg: 'rgba(30,58,95,0.08)', border: 'rgba(30,58,95,0.18)' },
+    audio: { label: '音频', color: '#6b21a8', bg: 'rgba(107,33,168,0.08)', border: 'rgba(107,33,168,0.18)' },
+    html: { label: 'HTML', color: '#0d6b6d', bg: 'rgba(13,107,109,0.08)', border: 'rgba(13,107,109,0.18)' },
+    text: { label: '文本', color: '#374151', bg: 'rgba(55,65,81,0.08)', border: 'rgba(55,65,81,0.18)' },
+    office: { label: '文档', color: '#92400e', bg: 'rgba(146,64,14,0.08)', border: 'rgba(146,64,14,0.18)' },
+    other: { label: '其他', color: '#475569', bg: 'rgba(71,85,105,0.08)', border: 'rgba(71,85,105,0.18)' },
+  }
+  return map[type] || map.other
+}
+
+/** 过滤后的列表 */
+const myProductsFiltered = computed(() => {
+  const keyword = myProductsKeyword.value.trim().toLowerCase()
+  if (!keyword) return myProductsList.value
+  return myProductsList.value.filter((item) =>
+    item.file_name.toLowerCase().includes(keyword),
+  )
+})
+
+/** 加载附件列表（根据当前 tab 调用不同接口） */
+const fetchMyProductsAttachments = async (page: number = 1) => {
+  if (myProductsLoading.value) return
+  myProductsLoading.value = true
+  try {
+    const apiCall =
+      myProductsTab.value === 'generated'
+        ? getGeneratedHistoryList(page, pageSize)
+        : getAppendixList(page, pageSize)
+    const response: any = await apiCall
+    const source = response?.data ?? response
+    const rawItems = Array.isArray(source?.items)
+      ? source.items
+      : Array.isArray(source?.data)
+        ? source.data
+        : Array.isArray(source)
+          ? source
+          : []
+    myProductsList.value = rawItems.map((item: any) => ({
+      file_id: item.file_id || item.fileId || item.id,
+      file_name: item.file_name || item.fileName || item.name || item.title || '',
+      file_url: item.file_url || item.fileUrl || item.url || item.download_url || '',
+      create_time: item.create_time || item.upload_time || item.createTime || item.uploadTime || '',
+    }))
+    myProductsPage.value = source?.page ?? page
+    myProductsTotal.value = source?.total ?? rawItems.length
+  } catch {
+    myProductsList.value = []
+    myProductsTotal.value = 0
+  } finally {
+    myProductsLoading.value = false
+  }
+}
+
+/** 切换 tab */
+const switchMyProductsTab = (tab: 'appendix' | 'generated') => {
+  if (myProductsTab.value === tab) return
+  myProductsTab.value = tab
+  myProductsKeyword.value = ''
+  fetchMyProductsAttachments()
+}
+
+/** 我的产物面板 - 上传文件 */
+const myProductsFileInput = ref<HTMLInputElement | null>(null)
+const myProductsUploading = ref(false)
+
+const handleMyProductsUploadClick = () => {
+  myProductsFileInput.value?.click()
+}
+
+const handleMyProductsFileSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = input.files
+  if (!files || files.length === 0) return
+
+  const file = files[0]
+  myProductsUploading.value = true
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('usr', getCurrentAccount())
+
+    const baseURL = import.meta.env.VITE_CHAT_API_BASE || ''
+    const response = await fetch(`${baseURL}/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`上传失败: ${response.status}`)
+    }
+
+    ElMessage.success(`文件 "${file.name}" 上传成功`)
+    fetchMyProductsAttachments()
+  } catch {
+    ElMessage.error(`文件 "${file.name}" 上传失败`)
+  } finally {
+    myProductsUploading.value = false
+    // 清空 input 以便重复选择同一文件也能触发 change
+    if (input) input.value = ''
+  }
+}
+
+/** 切换面板 */
+const toggleMyProducts = () => {
+  myProductsVisible.value = !myProductsVisible.value
+  if (myProductsVisible.value) {
+    fetchMyProductsAttachments()
+  }
+}
+
+// MD 文件渲染
+const myProductsMdLoading = ref(false)
+const myProductsMdHtml = ref('')
+const myProductsMdFallback = ref(false)
+
+/** 多编码尝试解码 */
+const decodeTextBuffer = (buffer: ArrayBuffer, contentType: string | null): string => {
+  const charset = contentType?.match(/charset=([^;]+)/i)?.[1]?.trim()
+  const labels = [charset, 'utf-8', 'gb18030', 'gbk', 'gb2312']
+    .filter((l): l is string => Boolean(l))
+    .map((l) => l!.toLowerCase())
+  const unique = [...new Set(labels)]
+  const countBad = (t: string) => (t.match(/�/g) || []).length
+  const candidates = unique.flatMap((label) => {
+    try { return [{ label, text: new TextDecoder(label).decode(buffer) }] }
+    catch { return [] }
+  })
+  if (candidates.length === 0) return new TextDecoder().decode(buffer)
+  return candidates.sort((a, b) => countBad(a.text) - countBad(b.text))[0].text
+}
+
+/** 预览 */
+const handleMyProductsPreview = async (item: GeneratedFileItem) => {
+  myProductsPreviewItem.value = item
+  myProductsPreviewVisible.value = true
+
+  // MD 文件：尝试 fetch + 编码检测 + marked 渲染
+  if (/\.(md|markdown)$/i.test(item.file_name)) {
+    myProductsMdLoading.value = true
+    myProductsMdHtml.value = ''
+    myProductsMdFallback.value = false
+    try {
+      const r = await fetch(transformMinioUrl(item.file_url))
+      const buffer = await r.arrayBuffer()
+      const text = decodeTextBuffer(buffer, r.headers.get('content-type'))
+      const { marked } = await import('marked')
+      marked.setOptions({ breaks: true, gfm: true })
+      myProductsMdHtml.value = marked.parse(text) as string
+    } catch {
+      myProductsMdFallback.value = true
+    } finally {
+      myProductsMdLoading.value = false
+    }
+  }
+}
+
+/** 关闭预览 */
+const closeMyProductsPreview = () => {
+  myProductsPreviewVisible.value = false
+  myProductsPreviewItem.value = null
+  myProductsMdHtml.value = ''
+  myProductsMdFallback.value = false
+}
+
+/** 引用到对话 — 将文件添加到输入框上方的文件展示区 */
+const handleMyProductsQuote = (item: GeneratedFileItem) => {
+  chatStore.addReferencedFile({
+    file_id: item.file_id,
+    file_name: item.file_name,
+    file_url: item.file_url,
+  })
+}
+
+/** 新窗口打开 - 域名映射 + token 拼接 */
+const openMyProductsFile = (item: GeneratedFileItem) => {
+  window.open(transformMinioUrl(item.file_url), '_blank')
+}
+
+/** 获取转换后的文件 URL（用于预览 src） */
+const getMyProductsFileUrl = (item: GeneratedFileItem): string => {
+  return transformMinioUrl(item.file_url)
+}
+
+/** 删除 */
+const handleMyProductsDelete = async (item: GeneratedFileItem) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除文件 "${item.file_name}" 吗？`, '删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    if (myProductsTab.value === 'generated') {
+      await deleteGeneratedHistory(item.file_id)
+    } else {
+      await deleteAppendix(item.file_id)
+    }
+    ElMessage.success('删除成功')
+    myProductsList.value = myProductsList.value.filter((f) => f.file_id !== item.file_id)
+    myProductsTotal.value = Math.max(0, myProductsTotal.value - 1)
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+/** 格式化时间 */
+const formatMyProductTime = (value?: string): string => {
+  return String(value || '').trim()
+}
+
 // 发送按钮图标延迟切换
 const showStopIcon = ref(false)
 let stopIconTimer: number | null = null
@@ -236,6 +510,10 @@ watch(
         showStopIcon.value = false
         stopIconTimer = null
       }, 180)
+      // 问答结束后，如果我的产物面板打开则刷新列表
+      if (myProductsVisible.value) {
+        fetchMyProductsAttachments()
+      }
     }
   },
 )
@@ -1128,8 +1406,23 @@ onDeactivated(() => {
 })
 
 // keep-alive 恢复时：重新挂载 resize 监听，刷新滚动状态
-onActivated(() => {
+// 如果 store 已被重置（退出登录后切换用户），需要重新初始化
+onActivated(async () => {
   window.addEventListener('resize', handleResize)
+
+  // 检测 store 是否被 resetAll() 重置过（退出登录场景），若是则重新初始化
+  if (isChatView.value && !chatStore.currentHistoryId && chatStore.historyList.length === 0) {
+    inputTextarea.value?.focus()
+    loadAnswerModels()
+    loadOfficerList()
+    loadMcpList()
+    if (!chatStore.hasMessages) {
+      startWelcomeTyping()
+    }
+    await chatStore.refreshHistoryList()
+    chatStore.generateUser()
+  }
+
   nextTick(() => {
     requestAnimationFrame(updateChatScrollState)
     requestAnimationFrame(updateActiveMessageFromScroll)
@@ -1187,6 +1480,23 @@ onActivated(() => {
               aria-hidden="true"
             ></span>
             <span v-if="!sidebarStore.collapsed">新建对话</span>
+          </button>
+        </el-tooltip>
+
+        <!-- 我的产物 -->
+        <el-tooltip
+          content="我的产物"
+          v-bind="sidebarTooltipProps"
+          :disabled="!sidebarStore.collapsed"
+        >
+          <button
+            v-if="!chatStore.isHistoryRefreshing"
+            class="grouped-sidebar__nav-btn"
+            type="button"
+            @click="toggleMyProducts()"
+          >
+            <el-icon :size="18"><FolderOpened /></el-icon>
+            <span v-if="!sidebarStore.collapsed">我的产物</span>
           </button>
         </el-tooltip>
 
@@ -1484,6 +1794,7 @@ onActivated(() => {
                     <div v-if="msg.role === 'user'" class="message-text user-text">
                       <SmartMessageRenderer
                         :message="msg"
+                        :is-streaming="false"
                         @expand-change="handleExpandChange"
                         @send-message="handleQuickStart"
                       />
@@ -1492,6 +1803,7 @@ onActivated(() => {
                     <div v-else class="message-text">
                       <SmartMessageRenderer
                         :message="msg"
+                        :is-streaming="chatStore.isStreaming && isLastAssistantMessage(msg)"
                         @expand-change="handleExpandChange"
                         @send-message="handleQuickStart"
                       />
@@ -1852,6 +2164,291 @@ onActivated(() => {
         </div>
       </template>
     </main>
+
+    <!-- 我的产物面板（右侧挤压主内容区） -->
+    <Transition name="slide-panel">
+      <aside
+        v-if="isChatView && myProductsVisible"
+        class="my-products-panel"
+        aria-label="我的产物"
+      >
+        <!-- 头部 -->
+        <div class="my-products-panel__header">
+          <div class="my-products-panel__header-left">
+            <div class="my-products-panel__title-row">
+              <h3 class="my-products-panel__title">我的产物</h3>
+              <span class="my-products-panel__total">{{ myProductsTotal }}</span>
+            </div>
+            <p class="my-products-panel__subtitle">上传附件 &amp; AI 生成的附件</p>
+          </div>
+          <div class="my-products-panel__header-actions">
+            <!-- 上传按钮（仅"我上传的"tab） -->
+            <el-tooltip content="上传文件" placement="bottom">
+              <button
+                v-if="myProductsTab === 'appendix'"
+                class="my-products-panel__upload-btn"
+                :class="{ 'my-products-panel__upload-btn--loading': myProductsUploading }"
+                type="button"
+                aria-label="上传文件"
+                :disabled="myProductsUploading"
+                @click="handleMyProductsUploadClick"
+              >
+                <span v-if="myProductsUploading" class="my-products-panel__upload-spinner"></span>
+                <img v-else :src="iconFileUpload" alt="上传" class="my-products-panel__upload-icon" />
+              </button>
+            </el-tooltip>
+            <button
+              class="my-products-panel__close"
+              type="button"
+              aria-label="关闭我的产物"
+              @click="myProductsVisible = false"
+            >
+              <el-icon :size="18"><Close /></el-icon>
+            </button>
+            <!-- 隐藏的文件选择器 -->
+            <input
+              ref="myProductsFileInput"
+              type="file"
+              style="display: none"
+              @change="handleMyProductsFileSelected"
+            />
+          </div>
+        </div>
+
+        <!-- Tab 切换 -->
+        <div class="my-products-panel__tabs">
+          <button
+            class="my-products-panel__tab"
+            :class="{ 'my-products-panel__tab--active': myProductsTab === 'generated' }"
+            @click="switchMyProductsTab('generated')"
+          >
+            我生成的
+          </button>
+          <button
+            class="my-products-panel__tab"
+            :class="{ 'my-products-panel__tab--active': myProductsTab === 'appendix' }"
+            @click="switchMyProductsTab('appendix')"
+          >
+            我上传的
+          </button>
+        </div>
+
+        <!-- 搜索框 -->
+        <div class="my-products-panel__search">
+          <el-input
+            v-model="myProductsKeyword"
+            class="my-products-panel__search-input"
+            placeholder="搜索文件名..."
+            clearable
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </div>
+
+        <!-- 内容区 -->
+        <el-scrollbar class="my-products-panel__body">
+          <!-- 加载骨架 -->
+          <div v-if="myProductsLoading" class="my-products-panel__loading">
+            <div v-for="i in 4" :key="i" class="my-products-panel__skeleton">
+              <div class="my-products-panel__skeleton-copy">
+                <div class="my-products-panel__skeleton-line my-products-panel__skeleton-line--title"></div>
+                <div class="my-products-panel__skeleton-line my-products-panel__skeleton-line--meta"></div>
+              </div>
+              <div class="my-products-panel__skeleton-actions">
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else-if="myProductsList.length === 0" class="my-products-panel__empty">
+            <el-icon :size="36"><FolderOpened /></el-icon>
+            <p>{{ myProductsTab === 'generated' ? '暂无我生成的附件' : '暂无我上传的附件' }}</p>
+          </div>
+
+          <!-- 无搜索结果 -->
+          <div v-else-if="myProductsFiltered.length === 0 && myProductsKeyword" class="my-products-panel__empty">
+            <el-icon :size="36"><Search /></el-icon>
+            <p>未找到匹配的文件</p>
+          </div>
+
+          <!-- 列表 -->
+          <div v-else class="my-products-panel__list">
+            <div
+              v-for="item in myProductsFiltered"
+              :key="item.file_id"
+              class="my-products-panel__item"
+            >
+              <div
+                class="my-products-panel__item-body"
+                role="button"
+                tabindex="0"
+                :aria-label="`预览 ${item.file_name}`"
+                @click="handleMyProductsPreview(item)"
+              >
+                <div class="my-products-panel__item-info">
+                  <span class="my-products-panel__item-name">{{ item.file_name }}</span>
+                  <div class="my-products-panel__item-meta">
+                    <span
+                      class="my-products-panel__item-tag"
+                      :style="{
+                        '--tag-color': getMyProductTagStyle(item.file_name).color,
+                        '--tag-bg': getMyProductTagStyle(item.file_name).bg,
+                        '--tag-border': getMyProductTagStyle(item.file_name).border,
+                      }"
+                    >
+                      {{ getMyProductTagStyle(item.file_name).label }}
+                    </span>
+                    <span class="my-products-panel__item-time">
+                      {{ formatMyProductTime(item.create_time) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="my-products-panel__item-actions">
+                <el-tooltip content="查看" placement="top">
+                  <button
+                    class="my-products-panel__action-btn"
+                    type="button"
+                    aria-label="查看"
+                    @click="handleMyProductsPreview(item)"
+                  >
+                    <el-icon :size="16"><View /></el-icon>
+                  </button>
+                </el-tooltip>
+                <el-tooltip content="引用到对话" placement="top">
+                  <button
+                    class="my-products-panel__action-btn"
+                    type="button"
+                    aria-label="引用到对话"
+                    @click="handleMyProductsQuote(item)"
+                  >
+                    <el-icon :size="16"><Link /></el-icon>
+                  </button>
+                </el-tooltip>
+                <el-tooltip content="下载" placement="top">
+                  <button
+                    class="my-products-panel__action-btn"
+                    type="button"
+                    aria-label="下载"
+                    @click="openMyProductsFile(item)"
+                  >
+                    <el-icon :size="16"><Download /></el-icon>
+                  </button>
+                </el-tooltip>
+                <el-tooltip content="删除" placement="top">
+                  <button
+                    class="my-products-panel__action-btn my-products-panel__action-btn--danger"
+                    type="button"
+                    aria-label="删除"
+                    @click="handleMyProductsDelete(item)"
+                  >
+                    <el-icon :size="16"><Delete /></el-icon>
+                  </button>
+                </el-tooltip>
+              </div>
+            </div>
+          </div>
+        </el-scrollbar>
+      </aside>
+    </Transition>
+
+    <!-- 产物预览弹窗 -->
+    <el-dialog
+      v-model="myProductsPreviewVisible"
+      :title="myProductsPreviewItem?.file_name || '预览'"
+      width="80%"
+      align-center
+      class="my-products-preview-dialog"
+      :close-on-click-modal="true"
+      :destroy-on-close="true"
+      @closed="closeMyProductsPreview"
+    >
+      <div v-if="myProductsPreviewItem" class="my-products-preview-body">
+        <!-- 图片 -->
+        <div v-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'image'" class="my-products-preview-image">
+          <img :src="getMyProductsFileUrl(myProductsPreviewItem)" :alt="myProductsPreviewItem.file_name" />
+        </div>
+        <!-- PDF（iframe，不受 CORS 影响） -->
+        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'pdf'" class="my-products-preview-pdf">
+          <iframe :src="getMyProductsFileUrl(myProductsPreviewItem)" frameborder="0"></iframe>
+        </div>
+        <!-- DOCX（<object> 标签，浏览器原生处理） -->
+        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'docx'" class="my-products-preview-pdf">
+          <object
+            :data="getMyProductsFileUrl(myProductsPreviewItem)"
+            type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            width="100%"
+            height="100%"
+            style="min-height:70vh"
+          >
+            <div class="my-products-preview-office-error">
+              <p>浏览器不支持预览该文档</p>
+              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)">下载 / 新窗口打开</el-button>
+            </div>
+          </object>
+        </div>
+        <!-- XLSX（<object> 标签，浏览器原生处理） -->
+        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'xlsx'" class="my-products-preview-pdf">
+          <object
+            :data="getMyProductsFileUrl(myProductsPreviewItem)"
+            type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            width="100%"
+            height="100%"
+            style="min-height:70vh"
+          >
+            <div class="my-products-preview-office-error">
+              <p>浏览器不支持预览该文档</p>
+              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)">下载 / 新窗口打开</el-button>
+            </div>
+          </object>
+        </div>
+        <!-- 视频 -->
+        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'video'" class="my-products-preview-video">
+          <video :src="getMyProductsFileUrl(myProductsPreviewItem)" controls>
+            您的浏览器不支持视频播放
+          </video>
+        </div>
+        <!-- 音频 -->
+        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'audio'" class="my-products-preview-audio">
+          <audio :src="getMyProductsFileUrl(myProductsPreviewItem)" controls>
+            您的浏览器不支持音频播放
+          </audio>
+        </div>
+        <!-- Markdown（fetch 渲染 or 降级 iframe） -->
+        <div
+          v-else-if="/\.(md|markdown)$/i.test(myProductsPreviewItem.file_name)"
+          class="my-products-preview-office"
+        >
+          <div v-if="myProductsMdLoading" class="my-products-preview-office-loading">
+            <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+            <span>加载中...</span>
+          </div>
+          <div v-else-if="myProductsMdFallback" class="my-products-preview-pdf">
+            <iframe :src="getMyProductsFileUrl(myProductsPreviewItem)" frameborder="0"></iframe>
+          </div>
+          <div v-else class="markdown-content" v-html="myProductsMdHtml"></div>
+        </div>
+        <!-- HTML / 文本（txt, html） -->
+        <div
+          v-else-if="['text', 'html'].includes(getMyProductFileType(myProductsPreviewItem.file_name))"
+          class="my-products-preview-pdf"
+        >
+          <iframe :src="getMyProductsFileUrl(myProductsPreviewItem)" frameborder="0"></iframe>
+        </div>
+        <!-- 其他（doc, ppt 等暂不支持） -->
+        <div v-else class="my-products-preview-other">
+          <el-icon :size="64"><Document /></el-icon>
+          <p>该文件类型暂不支持在线预览</p>
+          <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)">
+            下载 / 新窗口打开
+          </el-button>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 敏感词警告弹窗 -->
     <SensitiveWordDialog

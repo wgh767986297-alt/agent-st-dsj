@@ -64,7 +64,6 @@ import DOMPurify from 'dompurify'
 import ThinkingChain from './ThinkingChain.vue'
 import type { Message } from '@/types/chat'
 import { convertEmojiToImage } from '@/utils/emojiConverter'
-import { useChatStore } from '@/stores/chat'
 import { getFileIcon } from '@/utils/fileUtils'
 import { normalizeStreamingMarkdown } from '@/utils/markdownStream'
 import { normalizeStreamingUrls } from '@/utils/markdownUrl'
@@ -73,9 +72,12 @@ import arrowRightIcon from '@/assets/icons/chat/icon-chat-arrow-right.png'
 
 interface Props {
   message: Message
+  isStreaming?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  isStreaming: false,
+})
 
 const messageSkills = computed(() => {
   const skills = props.message.skills?.length
@@ -93,11 +95,7 @@ const messageSkills = computed(() => {
   })
 })
 
-// ✅ 获取 chatStore 以监听流式传输状态
-const chatStore = useChatStore()
-
-// ✅ 计算当前是否正在流式传输
-const isStreaming = computed(() => chatStore.isStreaming)
+// isStreaming 由父组件通过 props 传入，仅当前对话最后一条助手消息为 true
 
 // ✅ 判断是否有结构化内容
 const hasStructuredContent = computed(() => {
@@ -161,6 +159,18 @@ const normalizeUrlsInText = (content: string): string => {
   return processedContent
 }
 
+// ✅ 清理 URL 中的 markdown 格式字符（**、*、__、_、~~ 等）和末尾标点
+const cleanMarkdownUrl = (url: string): string => {
+  return url
+    .replace(/\*{1,2}$/g, '')   // 末尾 ** 或 *
+    .replace(/^\*{1,2}/g, '')    // 开头 ** 或 *
+    .replace(/_{1,2}$/g, '')     // 末尾 __ 或 _
+    .replace(/^_{1,2}/g, '')     // 开头 __ 或 _
+    .replace(/~{2}$/g, '')       // 末尾 ~~
+    .replace(/^~{2}/g, '')       // 开头 ~~
+    .replace(/[.,;:!?）)\]】〉》"']+$/g, '') // 末尾标点符号
+}
+
 // ✅ 自定义链接渲染规则，让所有链接在新标签页打开
 md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
   const token = tokens[idx]
@@ -168,7 +178,11 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
   // 查找 href 属性
   const hrefIndex = token.attrIndex('href')
   if (hrefIndex >= 0) {
-    const href = token.attrs![hrefIndex][1]
+    const rawHref = token.attrs![hrefIndex][1]
+    const href = cleanMarkdownUrl(rawHref)
+
+    // 更新 href 为清理后的值
+    token.attrs![hrefIndex][1] = href
 
     // 为所有外部链接添加 target="_blank" 和 rel 属性
     token.attrSet('target', '_blank')
@@ -178,8 +192,6 @@ md.renderer.rules.link_open = function (tokens, idx, options, env, self) {
     if (href.startsWith('http://') || href.startsWith('https://')) {
       token.attrSet('class', 'external-link')
     }
-    // 注：零信任令牌追加在 sanitizeAndRender 末尾统一对最终 HTML 做正则后处理，
-    // 确保覆盖 markdown 链接 + 原始 HTML <a> 标签，避免漏掉任何一种
   }
 
   return self.renderToken(tokens, idx, options)
@@ -353,13 +365,16 @@ const handleActionClick = (e: MouseEvent) => {
     const rawHref = linkEl.getAttribute('href')
     if (!rawHref) return
 
+    // 清理 URL 中的 markdown 格式残留
+    const cleanHref = cleanMarkdownUrl(rawHref)
+
     // 只处理外部链接
-    if (!rawHref.startsWith('http://') && !rawHref.startsWith('https://')) return
+    if (!cleanHref.startsWith('http://') && !cleanHref.startsWith('https://')) return
 
     e.preventDefault()
 
     // 域名映射 + token 拼接（幂等，与渲染时的转换一致）
-    const finalUrl = transformMinioUrl(rawHref)
+    const finalUrl = transformMinioUrl(cleanHref)
 
     window.open(finalUrl, '_blank', 'noopener,noreferrer')
   }
