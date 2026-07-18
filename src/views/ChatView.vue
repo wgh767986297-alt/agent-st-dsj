@@ -53,7 +53,6 @@ import { getCurrentAccount, isAdminAccount } from '@/utils/auth'
 defineOptions({ name: 'ChatView' })
 
 import arrowBottomIcon from '@/assets/icons/chat/icon-chat-arrow-bottom.png'
-import iconNavOpen from '@/assets/icons/nav/icon-nav-open.png'
 import iconNavHistory from '@/assets/icons/nav/icon-nav-history.png'
 import iconNewChat from '@/assets/icons/nav/icon-nav-chat.png'
 import iconFileUpload from '@/assets/icons/files/icon-file-upload.png'
@@ -618,7 +617,7 @@ const formatUserMessageTime = (timestamp: number) => {
 
 const hasInput = computed(() => currentInput.value.trim().length > 0)
 const selectedModelLabel = computed(
-  () => selectedModelName.value || modelList.value[0]?.name || '暂无模型',
+  () => selectedModelName.value || modelList.value[modelList.value.length - 1]?.name || '暂无模型',
 )
 
 const readStoredModelName = () => localStorage.getItem(SELECTED_MODEL_STORAGE_KEY) || ''
@@ -646,12 +645,12 @@ const resolveSelectedModelName = () => {
   if (selectedModelName.value) {
     return selectedModelName.value
   }
-  const firstModelName = modelList.value[0]?.name || ''
-  if (firstModelName) {
-    selectedModelName.value = firstModelName
-    writeStoredModelName(firstModelName)
+  const lastModelName = modelList.value[modelList.value.length - 1]?.name || ''
+  if (lastModelName) {
+    selectedModelName.value = lastModelName
+    writeStoredModelName(lastModelName)
   }
-  return firstModelName
+  return lastModelName
 }
 
 const normalizeSkillItem = (skill: SkillManageItem): SelectedSkill | null => {
@@ -737,7 +736,7 @@ const loadAnswerModels = async () => {
     if (storedModelName && modelList.value.some((model) => model.name === storedModelName)) {
       selectedModelName.value = storedModelName
     } else if (modelList.value.length > 0) {
-      selectedModelName.value = modelList.value[0].name
+      selectedModelName.value = modelList.value[modelList.value.length - 1].name
       writeStoredModelName(selectedModelName.value)
     } else {
       selectedModelName.value = ''
@@ -987,8 +986,6 @@ const sendCurrentMessage = async () => {
 
     currentInput.value = ''
     selectedSkills.value = []
-    selectedOfficers.value = []
-    selectedMcps.value = []
     skillSuggestVisible.value = false
     await nextTick()
 
@@ -1226,6 +1223,9 @@ const handleNewChat = async () => {
     await router.replace('/')
     await nextTick()
   }
+  // 重置滚动状态，避免新建对话后短暂显示回到底部按钮
+  isChatScrollable.value = false
+  chatScrollBottomDistance.value = 0
   const created = await chatStore.createNewChat()
   if (!created) return
   currentInput.value = ''
@@ -1438,29 +1438,6 @@ onActivated(async () => {
       class="grouped-sidebar"
       :class="{ 'grouped-sidebar--collapsed': sidebarStore.collapsed }"
     >
-      <div class="grouped-sidebar__brand">
-        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__brand-copy">
-          <div class="grouped-sidebar__title">历史对话</div>
-        </div>
-        <el-tooltip
-          :content="sidebarStore.collapsed ? '展开导航栏' : '收起导航栏'"
-          v-bind="sidebarTooltipProps"
-        >
-          <button
-            class="grouped-sidebar__collapse-button"
-            type="button"
-            :aria-label="sidebarStore.collapsed ? '展开导航栏' : '收起导航栏'"
-            @click="sidebarStore.toggleCollapse()"
-          >
-            <span
-              class="grouped-sidebar__collapse-icon"
-              :style="{ '--collapse-icon': `url(${iconNavOpen})` }"
-              aria-hidden="true"
-            ></span>
-          </button>
-        </el-tooltip>
-      </div>
-
       <div class="grouped-sidebar__qa">
         <!-- 新建对话 -->
         <el-tooltip
@@ -1499,6 +1476,9 @@ onActivated(async () => {
             <span v-if="!sidebarStore.collapsed">我的产物</span>
           </button>
         </el-tooltip>
+
+        <!-- 历史对话 -->
+        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__section-title">历史对话</div>
 
         <!-- 收起时的历史记录弹窗 -->
         <el-popover

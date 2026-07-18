@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>苏小智中枢智能体 - 用户操作手册</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   CSS Custom Properties (Design Tokens)
+   ============================================================ */
+:root {
+  --color-primary: #475569;
+  --color-secondary: #64748B;
+  --color-cta: #2563EB;
+  --color-cta-hover: #1D4ED8;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-text: #1E293B;
+  --color-text-muted: #64748B;
+  --color-text-light: #94A3B8;
+  --color-border: #E2E8F0;
+  --color-border-light: #F1F5F9;
+  --color-success: #16A34A;
+  --color-success-bg: #F0FDF4;
+  --color-warning: #D97706;
+  --color-warning-bg: #FFFBEB;
+  --color-danger: #DC2626;
+  --color-danger-bg: #FEF2F2;
+  --color-info: #2563EB;
+  --color-info-bg: #EFF6FF;
+
+  --sidebar-width: 280px;
+  --header-height: 64px;
+  --max-content-width: 820px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+/* Dark Mode */
+[data-theme="dark"] {
+  --color-bg: #0F172A;
+  --color-surface: #1E293B;
+  --color-text: #F1F5F9;
+  --color-text-muted: #94A3B8;
+  --color-text-light: #64748B;
+  --color-border: #334155;
+  --color-border-light: #1E293B;
+  --color-success-bg: #052E16;
+  --color-warning-bg: #451A03;
+  --color-danger-bg: #450A0A;
+  --color-info-bg: #172554;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================
+   Base Reset & Typography
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-height) + 24px);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.7;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.manual-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  height: var(--header-height);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+}
+
+.manual-header__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-header__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-cta);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.manual-header__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.manual-header__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manual-header__theme-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  font-size: 16px;
+}
+
+.manual-header__theme-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-secondary);
+  background: var(--color-border-light);
+}
+
+.manual-header__print-btn {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.manual-header__print-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-secondary);
+  background: var(--color-border-light);
+}
+
+/* Mobile menu toggle */
+.menu-toggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all var(--transition-fast);
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.manual-layout {
+  display: flex;
+  min-height: calc(100vh - var(--header-height));
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+.manual-sidebar {
+  position: sticky;
+  top: var(--header-height);
+  width: var(--sidebar-width);
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+  padding: 20px 16px;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+.manual-sidebar::-webkit-scrollbar { width: 4px; }
+.manual-sidebar::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 2px;
+}
+
+.sidebar__search {
+  margin-bottom: 20px;
+}
+
+.sidebar__search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+  outline: none;
+  transition: all var(--transition-fast);
+  font-family: inherit;
+}
+
+.sidebar__search input:focus {
+  border-color: var(--color-cta);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.sidebar__search input::placeholder {
+  color: var(--color-text-light);
+}
+
+.sidebar__search-wrap {
+  position: relative;
+}
+
+.sidebar__search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-light);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.sidebar__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-light);
+  padding: 8px 12px 6px;
+  margin-top: 4px;
+}
+
+.sidebar__nav {
+  list-style: none;
+}
+
+.sidebar__nav-item {
+  margin-bottom: 2px;
+}
+
+.sidebar__nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 450;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.sidebar__nav-link:hover {
+  color: var(--color-text);
+  background: var(--color-border-light);
+}
+
+.sidebar__nav-link--active {
+  color: var(--color-cta);
+  background: var(--color-info-bg);
+  font-weight: 500;
+}
+
+.sidebar__nav-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.sidebar__nav-link--active .sidebar__nav-icon {
+  opacity: 1;
+}
+
+.sidebar__sub-nav {
+  padding-left: 20px;
+  list-style: none;
+}
+
+.sidebar__sub-nav .sidebar__nav-link {
+  font-size: 12.5px;
+  padding: 6px 12px;
+}
+
+/* ============================================================
+   Main Content
+   ============================================================ */
+.manual-content {
+  flex: 1;
+  max-width: var(--max-content-width);
+  padding: 40px 48px 80px;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   Section Styles
+   ============================================================ */
+.manual-section {
+  margin-bottom: 56px;
+  scroll-margin-top: calc(var(--header-height) + 24px);
+}
+
+.manual-section:last-child {
+  margin-bottom: 0;
+}
+
+.section__anchor {
+  display: block;
+  position: relative;
+  top: calc(-1 * var(--header-height) - 24px);
+  visibility: hidden;
+}
+
+.section__heading {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.section__subtitle {
+  font-size: 15px;
+  color: var(--color-text-muted);
+  margin-bottom: 28px;
+  font-weight: 400;
+}
+
+.section__heading-2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 36px 0 12px;
+  letter-spacing: -0.01em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section__heading-3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 28px 0 10px;
+}
+
+.section__paragraph {
+  color: var(--color-text-muted);
+  margin-bottom: 16px;
+  line-height: 1.75;
+}
+
+.section__paragraph strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Cards & Components
+   ============================================================ */
+.info-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-normal);
+}
+
+.info-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.info-card__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.info-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.info-card__icon--blue { background: var(--color-info-bg); color: var(--color-cta); }
+.info-card__icon--green { background: var(--color-success-bg); color: var(--color-success); }
+.info-card__icon--amber { background: var(--color-warning-bg); color: var(--color-warning); }
+.info-card__icon--red { background: var(--color-danger-bg); color: var(--color-danger); }
+.info-card__icon--slate { background: var(--color-border-light); color: var(--color-secondary); }
+
+.info-card__desc {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin-left: 42px;
+}
+
+/* Step list */
+.step-list {
+  list-style: none;
+  counter-reset: step;
+}
+
+.step-list__item {
+  counter-increment: step;
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-normal);
+}
+
+.step-list__item:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.step-list__num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-info-bg);
+  color: var(--color-cta);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.step-list__num::before {
+  content: counter(step);
+}
+
+.step-list__body h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.step-list__body p {
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+/* Feature grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.feature-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  cursor: default;
+  transition: all var(--transition-normal);
+}
+
+.feature-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.feature-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+
+.feature-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.feature-card__desc {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Tips box */
+.tip-box {
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.tip-box--info {
+  background: var(--color-info-bg);
+  border-left: 3px solid var(--color-cta);
+  color: var(--color-text-muted);
+}
+
+.tip-box--success {
+  background: var(--color-success-bg);
+  border-left: 3px solid var(--color-success);
+  color: var(--color-text-muted);
+}
+
+.tip-box--warning {
+  background: var(--color-warning-bg);
+  border-left: 3px solid var(--color-warning);
+  color: var(--color-text-muted);
+}
+
+.tip-box--danger {
+  background: var(--color-danger-bg);
+  border-left: 3px solid var(--color-danger);
+  color: var(--color-text-muted);
+}
+
+.tip-box__icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.tip-box__content strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Role badge */
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.role-badge--super { background: #FEF2F2; color: #DC2626; }
+.role-badge--dept { background: #FFFBEB; color: #D97706; }
+.role-badge--audit { background: #EFF6FF; color: #2563EB; }
+.role-badge--user { background: #F0FDF4; color: #16A34A; }
+
+/* Table */
+.manual-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.manual-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.manual-table thead {
+  background: var(--color-border-light);
+}
+
+.manual-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.manual-table td {
+  padding: 12px 16px;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.manual-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.manual-table tbody tr:hover td {
+  background: var(--color-bg);
+}
+
+/* ============================================================
+   Back to top
+   ============================================================ */
+.back-to-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-normal);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  z-index: 50;
+}
+
+.back-to-top--visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.back-to-top:hover {
+  color: var(--color-text);
+  border-color: var(--color-secondary);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ============================================================
+   Print styles
+   ============================================================ */
+@media print {
+  .manual-sidebar,
+  .manual-header,
+  .back-to-top,
+  .menu-toggle {
+    display: none !important;
+  }
+
+  .manual-content {
+    max-width: 100%;
+    padding: 0 20px;
+  }
+
+  .manual-layout {
+    display: block;
+  }
+
+  body {
+    font-size: 12px;
+    color: #000;
+    background: #fff;
+  }
+
+  .info-card, .step-list__item, .feature-card {
+    box-shadow: none;
+    break-inside: avoid;
+    border: 1px solid #ddd;
+  }
+
+  .section__heading { font-size: 22px; }
+  .section__heading-2 { font-size: 18px; }
+  .section__heading-3 { font-size: 15px; }
+}
+
+/* ============================================================
+   Mobile responsive
+   ============================================================ */
+@media (max-width: 1024px) {
+  .manual-sidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    z-index: 90;
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .manual-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .menu-toggle {
+    display: flex;
+  }
+
+  .manual-content {
+    padding: 24px 20px 60px;
+    max-width: 100%;
+  }
+
+  .feature-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+
+  .manual-header {
+    padding: 0 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .manual-header__title {
+    font-size: 14px;
+  }
+
+  .section__heading {
+    font-size: 22px;
+  }
+
+  .section__heading-2 {
+    font-size: 18px;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-header__print-btn {
+    display: none;
+  }
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  top: var(--header-height);
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 89;
+}
+
+@media (max-width: 1024px) {
+  .sidebar-overlay--visible {
+    display: block;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+<header class="manual-header">
+  <div class="manual-header__left">
+    <button class="menu-toggle" onclick="toggleSidebar()" aria-label="菜单" title="菜单">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="manual-header__logo">苏</div>
+    <span class="manual-header__title">苏小智中枢智能体 — 用户操作手册</span>
+  </div>
+  <div class="manual-header__right">
+    <button class="manual-header__print-btn" onclick="window.print()" title="打印手册">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      打印手册
+    </button>
+    <button class="manual-header__theme-btn" onclick="toggleTheme()" aria-label="切换主题" title="切换亮色/暗色模式">
+      <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ============================================================
+     LAYOUT
+     ============================================================ -->
+<div class="manual-layout">
+
+  <!-- Sidebar -->
+  <aside class="manual-sidebar" id="manualSidebar">
+    <div class="sidebar__search">
+      <div class="sidebar__search-wrap">
+        <span class="sidebar__search-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input type="text" id="sidebarSearch" placeholder="搜索功能..." oninput="filterSidebar()">
+      </div>
+    </div>
+
+    <div class="sidebar__section-title">快速入门</div>
+    <ul class="sidebar__nav" data-section="getting-started">
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#overview" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#9702;</span>系统概述</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#quick-start" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#9733;</span>快速开始</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#roles" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#9711;</span>角色与权限</a></li>
+    </ul>
+
+    <div class="sidebar__section-title">功能模块</div>
+    <ul class="sidebar__nav" data-section="features">
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#chat" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>AI 智能问答</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#skills-market" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>技能库</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#mcp-management" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>MCP 专区</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#digital-police" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>数字警员库</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#my-permissions" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>我的权限</a></li>
+    </ul>
+
+    <div class="sidebar__section-title">系统管理</div>
+    <ul class="sidebar__nav" data-section="admin">
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#admin-overview" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#9881;</span>管理概览</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#account-audit" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>账号审核</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#model-management" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>模型管理</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#dept-management" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>部门管理</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#role-management" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>角色管理</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#audit-system" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>审核系统</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#authorization" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>统一授权</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#log-query" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#10003;</span>日志查询</a></li>
+    </ul>
+
+    <div class="sidebar__section-title">附录</div>
+    <ul class="sidebar__nav" data-section="appendix">
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#faq" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#63;</span>常见问题</a></li>
+      <li class="sidebar__nav-item"><a class="sidebar__nav-link" href="#shortcuts" onclick="closeSidebar()"><span class="sidebar__nav-icon">&#9889;</span>操作技巧</a></li>
+    </ul>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="manual-content">
+
+    <!-- ============================================================
+         SECTION: 系统概述
+         ============================================================ -->
+    <section class="manual-section" id="overview">
+      <span class="section__anchor"></span>
+      <h1 class="section__heading">系统概述</h1>
+      <p class="section__subtitle">了解苏小智中枢智能体的核心能力与应用场景</p>
+
+      <p class="section__paragraph">
+        <strong>苏小智中枢智能体</strong>是一个面向企业级的 AI 智能助手平台，集成了大语言模型对话、技能管理、MCP（Model Context Protocol）工具服务、数字警员（预设 AI 角色）等核心能力，旨在帮助用户高效完成日常办公、数据分析、文档处理等各类任务。
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <div class="feature-card__title">AI 智能对话</div>
+          <div class="feature-card__desc">多模型接入、流式响应、文件上传分析，让 AI 成为您的工作伙伴</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="feature-card__title">技能市场</div>
+          <div class="feature-card__desc">上传和管理自定义 AI 技能包，扩展 AI 的专业领域能力</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <div class="feature-card__title">MCP 工具服务</div>
+          <div class="feature-card__desc">接入标准化的工具调用协议，让 AI 能够执行实际操作</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="feature-card__title">数字警员</div>
+          <div class="feature-card__desc">预设 AI 角色，绑定专属技能与工具，即选即用</div>
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--info">
+        <span class="tip-box__icon">&#9432;</span>
+        <div class="tip-box__content">
+          <strong>适用场景：</strong>日常办公辅助、数据分析报告、文档生成处理、专业知识问答、业务流程自动化等。系统通过浏览器访问，支持主流浏览器（Chrome、Edge、Firefox 等）。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 快速开始
+         ============================================================ -->
+    <section class="manual-section" id="quick-start">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">快速开始</h2>
+      <p class="section__subtitle">从登录到第一次对话，只需几步</p>
+
+      <h3 class="section__heading-3">第一步：通过统一登录平台进入系统</h3>
+      <ol class="step-list">
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>访问统一登录平台</h4>
+            <p>在浏览器中打开单位统一登录平台门户，完成身份认证。平台已集成零信任安全架构，确保访问链路安全可信。</p>
+          </div>
+        </li>
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>点击进入"苏小智中枢智能体"</h4>
+            <p>在统一登录平台的应用列表中找到"苏小智中枢智能体"入口，点击后系统将自动携带您的身份凭证，以零信任方式免密登录进入系统。</p>
+          </div>
+        </li>
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>自动进入主页</h4>
+            <p>认证通过后，系统自动跳转至"做一做"主页，无需输入任何账号密码，即可立即开始与 AI 对话。</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="tip-box tip-box--info">
+        <span class="tip-box__icon">&#9432;</span>
+        <div class="tip-box__content">
+          <strong>说明：</strong>苏小智中枢智能体采用零信任安全架构，所有用户均通过统一登录平台完成身份认证后免密进入。新用户首次使用前，请确认您的账号已在系统中开通并通过审批。如无法在应用列表中找到入口，请联系系统管理员确认权限。
+        </div>
+      </div>
+
+      <h3 class="section__heading-3">第二步：开始第一次对话</h3>
+      <ol class="step-list">
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>选择模型</h4>
+            <p>点击输入框上方的模型选择器，从可用模型列表中选择合适的大语言模型。选择后将自动保存，下次使用默认选中。</p>
+          </div>
+        </li>
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>输入问题</h4>
+            <p>在底部输入框中输入您的问题或需求，支持普通文本和多行输入。按 Enter 发送，Shift + Enter 换行。</p>
+          </div>
+        </li>
+        <li class="step-list__item">
+          <span class="step-list__num"></span>
+          <div class="step-list__body">
+            <h4>查看回复</h4>
+            <p>AI 将以流式方式实时返回答案。您可以查看思考过程（点击折叠面板展开）、复制回复内容、或重新生成答案。</p>
+          </div>
+        </li>
+      </ol>
+
+      <h3 class="section__heading-3">第三步：了解导航结构</h3>
+      <p class="section__paragraph">
+        系统顶部导航栏展示了您可访问的所有功能模块。根据您的角色权限，可见的导航项有所不同：
+      </p>
+      <div class="manual-table-wrap">
+        <table class="manual-table">
+          <thead>
+            <tr><th>导航名称</th><th>功能说明</th><th>谁可以访问</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>做一做</strong></td><td>AI 智能问答主页面</td><td>所有用户</td></tr>
+            <tr><td><strong>技能库</strong></td><td>浏览和管理 AI 技能</td><td>所有用户</td></tr>
+            <tr><td><strong>MCP 专区</strong></td><td>MCP 工具服务管理</td><td>所有用户</td></tr>
+            <tr><td><strong>数字警员库</strong></td><td>预设 AI 角色库</td><td>所有用户</td></tr>
+            <tr><td><strong>系统管理</strong></td><td>后台管理功能集合</td><td>超级管理员 / 部门管理员</td></tr>
+            <tr><td><strong>安全审计</strong></td><td>登录和操作日志查询</td><td>安全审计员 / 超级管理员</td></tr>
+            <tr><td><strong>我的权限</strong></td><td>查看个人权限和授权资源</td><td>超级管理员 / 部门管理员</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 角色与权限
+         ============================================================ -->
+    <section class="manual-section" id="roles">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">角色与权限</h2>
+      <p class="section__subtitle">了解不同角色的职责与可访问的功能范围</p>
+
+      <p class="section__paragraph">
+        系统采用四级角色体系，每个角色拥有不同的功能访问权限。管理员可以为用户分配一个或多个角色。
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--red">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          超级管理员
+        </div>
+        <div class="info-card__desc">
+          拥有系统全部功能权限。可访问所有页面，管理所有后台功能，执行两级审核（终审），管理系统配置和模型。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--amber">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          部门管理员
+        </div>
+        <div class="info-card__desc">
+          管理系统管理后台的各个子模块：账号审核、部门管理、角色分配，以及技能/警员/MCP 的一级审核。可进行统一授权管理。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          安全审计员
+        </div>
+        <div class="info-card__desc">
+          专门负责安全审计，可查看登录日志、聊天日志和操作日志，对系统的安全使用情况进行监督。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          普通用户
+        </div>
+        <div class="info-card__desc">
+          使用 AI 智能问答、浏览技能市场、使用 MCP 服务和数字警员。可以上传自定义技能和注册 MCP 服务，经审核后发布。
+        </div>
+      </div>
+
+      <div class="manual-table-wrap" style="margin-top: 24px;">
+        <table class="manual-table">
+          <thead>
+            <tr><th>功能</th><th>普通用户</th><th>安全审计员</th><th>部门管理员</th><th>超级管理员</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>AI 对话</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>技能库</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>MCP 专区</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>数字警员库</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>安全审计</td><td>-</td><td>&#10004;</td><td>-</td><td>&#10004;</td></tr>
+            <tr><td>系统管理</td><td>-</td><td>-</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>我的权限</td><td>-</td><td>-</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>账号审核</td><td>-</td><td>-</td><td>&#10004;</td><td>&#10004;</td></tr>
+            <tr><td>模型管理</td><td>-</td><td>-</td><td>-</td><td>&#10004;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: AI 智能问答（做一做）
+         ============================================================ -->
+    <section class="manual-section" id="chat">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">AI 智能问答</h2>
+      <p class="section__subtitle">系统核心功能 — 与 AI 进行多轮对话，完成各种任务</p>
+
+      <h3 class="section__heading-3">对话界面组成</h3>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          </div>
+          <div class="feature-card__title">左侧：会话列表</div>
+          <div class="feature-card__desc">新建对话、查看历史记录、重命名/删除会话、"我的产物"文件管理</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+          </div>
+          <div class="feature-card__title">中间：对话区域</div>
+          <div class="feature-card__desc">AI 流式回答展示、思考过程折叠面板、消息复制与重新生成</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          </div>
+          <div class="feature-card__title">右侧：导航点</div>
+          <div class="feature-card__desc">对话目录导航，快速跳转到任意问答位置，自动高亮当前位置</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          </div>
+          <div class="feature-card__title">底部：输入区域</div>
+          <div class="feature-card__desc">模型选择、文件上传、警员/MCP选择、@技能调用、发送/停止按钮</div>
+        </div>
+      </div>
+
+      <h3 class="section__heading-3">核心功能详解</h3>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#9881;</div>
+          模型选择
+        </div>
+        <div class="info-card__desc">
+          在对话输入框上方可以切换当前使用的 AI 模型。系统支持多种大语言模型，不同的模型在推理能力、响应速度和擅长领域上有所不同。选择后将保存在本地，下次登录自动沿用。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#128206;</div>
+          文件上传与分析
+        </div>
+        <div class="info-card__desc">
+          支持上传 <strong>PDF、DOCX、XLSX、CSV、TXT、MD、JPG、PNG</strong> 等格式文件。可通过点击上传按钮、拖拽文件到输入区、或粘贴（Ctrl+V）方式上传。上传后 AI 将基于文件内容进行分析和回答。多个文件可同时上传，显示在输入框上方。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--amber">&#128161;</div>
+          思考过程可视化
+        </div>
+        <div class="info-card__desc">
+          AI 回答时，您可以展开折叠面板查看其"思考过程"——包括技术分析步骤、工具调用的参数与结果、处理文本等。这有助于了解 AI 的推理逻辑和结果来源。思考过程以时间线形式展示，支持逐条展开或折叠。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--slate">&#128260;</div>
+          会话管理
+        </div>
+        <div class="info-card__desc">
+          左侧会话列表保存了所有的历史对话。支持：<strong>新建对话</strong>（开始全新话题）、<strong>重命名会话</strong>（长按或右键编辑标题）、<strong>删除会话</strong>（永久删除历史记录）。点击历史会话即可快速切换查看。系统还支持"我的产物"面板，集中管理您上传的文件和 AI 生成的输出文件。
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--success">
+        <span class="tip-box__icon">&#10003;</span>
+        <div class="tip-box__content">
+          <strong>小技巧：</strong>给 AI 提供清晰、具体的指令会得到更好的回答。例如，"帮我写一份关于XX项目的周报，包含本周完成的工作、遇到的问题和下周计划"比"写一份周报"效果更好。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 技能库
+         ============================================================ -->
+    <section class="manual-section" id="skills-market">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">技能库</h2>
+      <p class="section__subtitle">管理和使用 AI 技能包，扩展 AI 专业能力</p>
+
+      <p class="section__paragraph">
+        技能（Skill）是预设的提示工程包，可以为 AI 注入特定领域的专业知识和处理逻辑。技能库分为两个标签页：
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128100;</div>
+          我的技能
+        </div>
+        <div class="info-card__desc">
+          展示您自己创建和上传的所有技能。您可以在此：<strong>上传新技能</strong>（定义技能名称、分类、描述和提示词内容）、<strong>申请发布</strong>（提交审核后公开到技能市场）、<strong>申请下架</strong>（将已发布的技能撤回）、<strong>删除</strong>未发布的技能。技能状态包括：未发布、审核中、已发布、已驳回。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#127760;</div>
+          通用技能
+        </div>
+        <div class="info-card__desc">
+          浏览所有已公开发布的技能。可以通过分类筛选和关键词搜索来查找所需技能。发布的技能可供所有用户在对话中使用，提升特定领域任务的处理效果。
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--info">
+        <span class="tip-box__icon">&#9432;</span>
+        <div class="tip-box__content">
+          <strong>审核流程：</strong>技能从创建到公开发布需要经过两级审核——先由部门管理员初审，再由超级管理员终审。审核通过后，技能将出现在通用技能市场中供所有人使用。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: MCP 专区
+         ============================================================ -->
+    <section class="manual-section" id="mcp-management">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">MCP 专区</h2>
+      <p class="section__subtitle">注册和管理 Model Context Protocol 工具服务</p>
+
+      <p class="section__paragraph">
+        MCP（Model Context Protocol）是一种标准化的工具调用协议，允许 AI 模型通过工具服务器执行实际操作，如查询数据库、调用 API、操作文件等。
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128295;</div>
+          我的 MCP 服务
+        </div>
+        <div class="info-card__desc">
+          <p>展示您自己注册的 MCP 服务。注册时需提供：</p>
+          <ul style="margin: 8px 0 0 18px; color: var(--color-text-muted);">
+            <li style="margin-bottom: 4px;"><strong>名称和编码</strong>：服务的标识信息</li>
+            <li style="margin-bottom: 4px;"><strong>类型和描述</strong>：分类和功能说明</li>
+            <li style="margin-bottom: 4px;"><strong>服务器 URL</strong>：MCP 服务的连接地址</li>
+            <li style="margin-bottom: 4px;"><strong>配置 JSON</strong>：服务所需的参数配置</li>
+            <li><strong>图标</strong>：便于识别的服务图标</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#127760;</div>
+          通用 MCP 服务
+        </div>
+        <div class="info-card__desc">
+          浏览所有已发布上线的 MCP 服务。点击服务卡片可查看详细信息，包括服务配置参数。已发布的服务可以在对话中被 AI 调用，扩展对话的能力边界。
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--warning">
+        <span class="tip-box__icon">&#9888;</span>
+        <div class="tip-box__content">
+          <strong>注意：</strong>MCP 服务的发布和下架同样需要经过两级审核。请确保服务 URL 和配置参数正确无误后再提交审核。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 数字警员库
+         ============================================================ -->
+    <section class="manual-section" id="digital-police">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">数字警员库</h2>
+      <p class="section__subtitle">创建和使用预设 AI 角色，提升专业场景下的对话效率</p>
+
+      <p class="section__paragraph">
+        数字警员是预先配置好的 AI 角色，每个警员绑定了一套系统提示词、关联技能和 MCP 服务。在对话中选择警员后，AI 将自动加载其专属配置，以特定的人设和专业能力进行回答。
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128100;</div>
+          我的警员
+        </div>
+        <div class="info-card__desc">
+          创建和管理自定义数字警员。创建时需配置：<strong>名称和描述</strong>（警员的基本信息）、<strong>系统提示词/头像</strong>（定义警员的角色定位和行为方式）、<strong>关联技能</strong>（为警员绑定专业能力）、<strong>关联 MCP 服务</strong>（为警员绑定工具能力）。警员支持按状态筛选（已发布、审核中、已下架），支持编辑和删除操作。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#127760;</div>
+          通用警员
+        </div>
+        <div class="info-card__desc">
+          浏览所有已公开发布的警员。看到合适的警员可以一键复制到"我的警员"列表中使用，无需从零创建。
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--success">
+        <span class="tip-box__icon">&#10003;</span>
+        <div class="tip-box__content">
+          <strong>使用场景举例：</strong>创建一个"数据分析师"警员，绑定数据处理的技能和 Excel 操作的 MCP 服务，使其专注于数据分析和报表生成任务。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 我的权限
+         ============================================================ -->
+    <section class="manual-section" id="my-permissions">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">我的权限</h2>
+      <p class="section__subtitle">查看个人角色、部门信息及已授权的资源清单</p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128274;</div>
+          权限总览
+        </div>
+        <div class="info-card__desc">
+          在"我的权限"页面，您可以查看：当前角色和所属部门、可访问的页面列表数量、已授权的资源总数，以及具体的资源详情（技能、MCP 服务、数字警员的授权清单）。授权资源以标签形式展示，清晰显示每种资源的授权状态。
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--info">
+        <span class="tip-box__icon">&#9432;</span>
+        <div class="tip-box__content">
+          <strong>说明：</strong>如需获取更多资源访问权限，请联系部门管理员或超级管理员通过"统一授权"功能进行授权。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 系统管理概览
+         ============================================================ -->
+    <section class="manual-section" id="admin-overview">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">系统管理</h2>
+      <p class="section__subtitle">管理员专属功能 — 用户管理、资源配置、审核流程</p>
+
+      <p class="section__paragraph">
+        系统管理是超级管理员和部门管理员的后台管理入口。点击顶部导航栏的"系统管理"进入后，您将看到一个包含多个子模块的管理页面。通过切换顶部标签页可以访问不同的管理功能。
+      </p>
+
+      <p class="section__paragraph">
+        系统管理包含以下子模块（根据角色权限，部分模块可能不可见）：
+      </p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">&#10003;</div>
+          <div class="feature-card__title">账号审核</div>
+          <div class="feature-card__desc">审批新用户账号开通申请</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">&#128269;</div>
+          <div class="feature-card__title">日志查询</div>
+          <div class="feature-card__desc">查看系统各类操作日志</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">&#9881;</div>
+          <div class="feature-card__title">模型管理</div>
+          <div class="feature-card__desc">配置 AI 模型参数</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">&#9733;</div>
+          <div class="feature-card__title">技能管理</div>
+          <div class="feature-card__desc">管理所有 AI 技能</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">&#128295;</div>
+          <div class="feature-card__title">MCP 管理</div>
+          <div class="feature-card__desc">管理所有 MCP 服务</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">&#127970;</div>
+          <div class="feature-card__title">部门管理</div>
+          <div class="feature-card__desc">管理部门和成员</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">&#128100;</div>
+          <div class="feature-card__title">角色管理</div>
+          <div class="feature-card__desc">为用户分配角色</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--red">&#9745;</div>
+          <div class="feature-card__title">技能审核</div>
+          <div class="feature-card__desc">审核技能发布申请</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">&#9745;</div>
+          <div class="feature-card__title">警员审核</div>
+          <div class="feature-card__desc">审核警员发布申请</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">&#9745;</div>
+          <div class="feature-card__title">MCP 审核</div>
+          <div class="feature-card__desc">审核 MCP 服务申请</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">&#128221;</div>
+          <div class="feature-card__title">操作日志</div>
+          <div class="feature-card__desc">管理员操作审计记录</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">&#128273;</div>
+          <div class="feature-card__title">统一授权</div>
+          <div class="feature-card__desc">管理资源访问权限</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 账号审核
+         ============================================================ -->
+    <section class="manual-section" id="account-audit">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">账号审核</h2>
+      <p class="section__paragraph">
+        管理员审核新用户的账号开通申请。用户列表支持按<strong>审批状态</strong>（待审核/已通过/已驳回）、<strong>角色</strong>和<strong>部门</strong>进行筛选，也支持按姓名、账号、手机号进行搜索。
+      </p>
+      <p class="section__paragraph">
+        <strong>操作步骤：</strong>在用户列表中找到待审核的用户，点击"通过"或"驳回"按钮。通过时需确认用户信息是否正确；驳回时需填写驳回原因。支持批量审批操作。管理员还可以编辑用户的基本信息（姓名、手机号、所属单位、部门、密码等）。
+      </p>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 模型管理
+         ============================================================ -->
+    <section class="manual-section" id="model-management">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">模型管理</h2>
+      <p class="section__paragraph">
+        仅超级管理员可访问。在此配置系统可用的 AI 大语言模型，包括：
+      </p>
+      <div class="info-card">
+        <div class="info-card__desc">
+          <ul style="margin-left: 18px; color: var(--color-text-muted);">
+            <li style="margin-bottom: 6px;"><strong>模型名称和标识符</strong>：在系统中显示的名称和唯一标识</li>
+            <li style="margin-bottom: 6px;"><strong>API 地址和密钥</strong>：模型服务的连接信息和认证凭据</li>
+            <li style="margin-bottom: 6px;"><strong>超时设置</strong>：连接超时、读取超时和最大重试次数</li>
+            <li style="margin-bottom: 6px;"><strong>思考模式开关</strong>：控制是否启用模型的思考链展示</li>
+            <li><strong>管理员可见性</strong>：控制模型是否仅对管理员可见</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 部门管理
+         ============================================================ -->
+    <section class="manual-section" id="dept-management">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">部门管理</h2>
+      <p class="section__paragraph">
+        管理员可对组织部门进行增删改查操作。功能包括：
+      </p>
+      <ul style="margin-left: 20px; color: var(--color-text-muted); margin-bottom: 16px; line-height: 2;">
+        <li><strong>创建部门</strong>：填写部门名称和编码</li>
+        <li><strong>编辑部门</strong>：修改部门信息</li>
+        <li><strong>删除部门</strong>：单个或批量删除</li>
+        <li><strong>用户配额管理</strong>：设置部门可容纳的用户数量上限</li>
+        <li><strong>成员管理</strong>：向部门添加成员或从部门移除成员</li>
+        <li><strong>搜索</strong>：按部门名称或编码快速查找</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 角色管理
+         ============================================================ -->
+    <section class="manual-section" id="role-management">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">角色管理</h2>
+      <p class="section__paragraph">
+        管理员为用户分配系统角色。操作流程：先按部门筛选用户列表，选择目标用户，查看其当前拥有的角色，然后为其分配或移除角色。系统支持四种角色：<span class="role-badge role-badge--super">超级管理员</span> <span class="role-badge role-badge--dept">部门管理员</span> <span class="role-badge role-badge--audit">安全审计员</span> <span class="role-badge role-badge--user">普通用户</span>。
+      </p>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 审核系统
+         ============================================================ -->
+    <section class="manual-section" id="audit-system">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">审核系统（两级审核）</h2>
+      <p class="section__paragraph">
+        系统中技能、数字警员和 MCP 服务的发布、下架和删除操作都需要经过审核。采用<strong>两级审核机制</strong>确保内容质量：
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--amber">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          一级审核：部门管理员
+        </div>
+        <div class="info-card__desc">
+          用户提交发布申请后，首先由所属部门管理员进行初审。部门管理员审核请求内容、检查配置是否正确、评估是否符合发布标准。可查看申请人信息、申请内容和申请时间。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--red">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          二级审核：超级管理员
+        </div>
+        <div class="info-card__desc">
+          部门管理员审核通过后，申请进入超级管理员的终审队列。超级管理员进行最终审核，批准后资源才正式发布上线。两级审核状态都以标签形式展示，清晰可见。
+        </div>
+      </div>
+
+      <p class="section__paragraph">
+        审核页面顶部显示各状态的统计数量（全部、待审核、已通过、已驳回、已下架），方便管理员快速了解待处理工作量。每个待审核项的详细信息以卡片形式展示。
+      </p>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 统一授权
+         ============================================================ -->
+    <section class="manual-section" id="authorization">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">统一授权</h2>
+      <p class="section__paragraph">
+        管理员为特定用户或整个部门授予资源（技能、MCP 服务、数字警员）的访问权限。
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128269;</div>
+          授权列表
+        </div>
+        <div class="info-card__desc">
+          按用户或部门维度查看已有的授权记录。支持按部门和用户级联筛选。每条授权记录展示：资源类型（技能/MCP/警员）、资源名称、授权目标、授权人、授权状态和有效期。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#10133;</div>
+          新增授权
+        </div>
+        <div class="info-card__desc">
+          <ol style="margin: 8px 0 0 18px; color: var(--color-text-muted); line-height: 2;">
+            <li>选择授权目标类型：用户 或 部门</li>
+            <li>选择具体的用户或部门</li>
+            <li>选择资源类型：技能 / MCP 服务 / 数字警员</li>
+            <li>选择具体要授权的资源</li>
+            <li>设置授权有效期</li>
+            <li>确认提交</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="tip-box tip-box--info">
+        <span class="tip-box__icon">&#9432;</span>
+        <div class="tip-box__content">
+          <strong>提示：</strong>可以随时在授权列表中撤销（取消）已授予的权限。撤销后目标用户/部门将无法再访问该资源。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 日志查询
+         ============================================================ -->
+    <section class="manual-section" id="log-query">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading-2">日志查询（安全审计）</h2>
+      <p class="section__paragraph">
+        安全审计员和超级管理员可通过此功能查看和审计系统的使用情况。日志分为三个标签页：
+      </p>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--blue">&#128273;</div>
+          登录日志
+        </div>
+        <div class="info-card__desc">
+          记录所有用户的登录行为，包含：<strong>账号、姓名、IP 地址、登录时间、登录方式（零信任免密）、登录状态</strong>。支持按关键词、角色和时间范围筛选。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--green">&#128172;</div>
+          聊天日志
+        </div>
+        <div class="info-card__desc">
+          记录所有用户的对话内容，包含：<strong>用户姓名、角色、提问内容、AI 回答内容、对话时间、IP 地址</strong>。支持按关键词、角色和时间范围筛选，以分页表格展示。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title">
+          <div class="info-card__icon info-card__icon--amber">&#128221;</div>
+          操作日志
+        </div>
+        <div class="info-card__desc">
+          记录所有管理员的系统操作，包含：<strong>操作用户、账号、角色、操作类型（创建/更新/删除/分配/认证/审核/申请）、操作模块、操作内容、IP 地址、操作时间</strong>。支持按操作类型和模块筛选，支持按日期范围查询，并提供<strong>导出 Excel</strong> 功能便于离线分析。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 常见问题
+         ============================================================ -->
+    <section class="manual-section" id="faq">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">常见问题</h2>
+      <p class="section__subtitle">使用过程中可能遇到的常见问题和解答</p>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          如何登录苏小智中枢智能体？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>请通过单位统一登录平台进入，在应用列表中找到"苏小智中枢智能体"并点击，系统将通过零信任方式自动完成免密登录。无需手动输入账号密码。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          在统一登录平台看不到苏小智的入口怎么办？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>您的账号可能尚未开通使用权限。请联系您所在部门的管理员或超级管理员，为您开通账号并分配相应的角色权限。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          AI 回答不准确怎么办？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>您可以尝试：1）换一种方式重新描述问题；2）使用更具体、更详细的提示；3）上传相关文件作为参考资料；4）切换不同的 AI 模型重试；5）选择合适的数字警员以获得更专业的回答。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          上传的文件大小有限制吗？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>系统对上传文件大小有一定限制，具体限制取决于服务器配置。建议上传的文件控制在合理大小范围内。过大的文件可能影响 AI 处理速度。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          如何分享我的技能或警员给其他人使用？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>在"我的技能"或"我的警员"中点击"申请发布"，经两级审核通过后，您的资源将出现在通用市场中，所有用户都可以搜索和使用。
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="info-card__title" style="font-weight: 500; font-size: 15px;">
+          <span style="color: var(--color-cta); font-weight: 700; margin-right: 8px;">Q</span>
+          如何切换亮色/暗色主题？
+        </div>
+        <div class="info-card__desc">
+          <strong>A：</strong>系统支持跟随系统的主题设置自动切换亮色/暗色模式。如需手动切换，请在系统设置中调整主题偏好。登录页面默认使用亮色主题。
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION: 操作技巧
+         ============================================================ -->
+    <section class="manual-section" id="shortcuts">
+      <span class="section__anchor"></span>
+      <h2 class="section__heading">操作技巧</h2>
+      <p class="section__subtitle">提升使用效率的实用技巧和快捷操作</p>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </div>
+          <div class="feature-card__title">Enter 发送消息</div>
+          <div class="feature-card__desc">在输入框中按 Enter 键直接发送消息，Shift + Enter 换行输入多行文本</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </div>
+          <div class="feature-card__title">Ctrl+V 粘贴文件</div>
+          <div class="feature-card__desc">复制文件后，在对话页面按 Ctrl+V 可直接将文件上传为对话附件</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          </div>
+          <div class="feature-card__title">拖拽上传文件</div>
+          <div class="feature-card__desc">将文件从桌面或文件夹直接拖拽到对话输入区域，即可自动上传为附件</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="feature-card__title">停止生成</div>
+          <div class="feature-card__desc">AI 回答过程中点击停止按钮，可随时中断生成，已生成的内容会保留</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          </div>
+          <div class="feature-card__title">重新生成回答</div>
+          <div class="feature-card__desc">对 AI 的回答不满意？点击消息旁的重试按钮，用相同问题重新生成答案</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--green">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+          </div>
+          <div class="feature-card__title">复制回复内容</div>
+          <div class="feature-card__desc">每条 AI 回复旁都有复制按钮，一键将回答内容（含格式）复制到剪贴板</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--amber">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <div class="feature-card__title">长按重命名</div>
+          <div class="feature-card__desc">在左侧会话列表中，长按历史会话条目可触发重命名操作</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-card__icon info-card__icon--slate">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="feature-card__title">回到最底部</div>
+          <div class="feature-card__desc">当向上滚动查看历史消息时，右下角会出现"回到底部"按钮，点击即可跳转</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <div style="text-align: center; padding: 48px 0 24px; color: var(--color-text-light); font-size: 13px; border-top: 1px solid var(--color-border); margin-top: 48px;">
+      <p>苏小智中枢智能体 &copy; 2026 — 用户操作手册</p>
+      <p style="margin-top: 4px;">如有疑问，请联系系统管理员</p>
+    </div>
+
+  </main>
+</div>
+
+<!-- Back to top button -->
+<button class="back-to-top" id="backToTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" aria-label="回到顶部" title="回到顶部">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<!-- ============================================================
+     SCRIPTS
+     ============================================================ -->
+<script>
+// Theme toggle
+(function() {
+  const saved = localStorage.getItem('manual-theme');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next || 'light');
+  localStorage.setItem('manual-theme', next || 'light');
+  updateThemeIcons();
+}
+
+function updateThemeIcons() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('theme-icon-sun').style.display = isDark ? 'none' : '';
+  document.getElementById('theme-icon-moon').style.display = isDark ? '' : 'none';
+}
+updateThemeIcons();
+
+// Back to top
+const backToTop = document.getElementById('backToTop');
+window.addEventListener('scroll', function() {
+  if (window.scrollY > 400) {
+    backToTop.classList.add('back-to-top--visible');
+  } else {
+    backToTop.classList.remove('back-to-top--visible');
+  }
+});
+
+// Mobile sidebar toggle
+function toggleSidebar() {
+  const sidebar = document.getElementById('manualSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('manual-sidebar--open');
+  overlay.classList.toggle('sidebar-overlay--visible');
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('manualSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.remove('manual-sidebar--open');
+  overlay.classList.remove('sidebar-overlay--visible');
+}
+
+// Active sidebar link tracking
+const sidebarLinks = document.querySelectorAll('.sidebar__nav-link');
+const sections = document.querySelectorAll('.manual-section[id]');
+
+function updateActiveLink() {
+  let current = '';
+  sections.forEach(function(section) {
+    const rect = section.getBoundingClientRect();
+    if (rect.top <= 120) {
+      current = section.getAttribute('id');
+    }
+  });
+  sidebarLinks.forEach(function(link) {
+    link.classList.remove('sidebar__nav-link--active');
+    if (link.getAttribute('href') === '#' + current) {
+      link.classList.add('sidebar__nav-link--active');
+    }
+  });
+}
+
+window.addEventListener('scroll', updateActiveLink, { passive: true });
+updateActiveLink();
+
+// Sidebar search filter
+function filterSidebar() {
+  const query = document.getElementById('sidebarSearch').value.toLowerCase().trim();
+  const navItems = document.querySelectorAll('.sidebar__nav-item');
+  const sectionTitles = document.querySelectorAll('.sidebar__section-title');
+
+  if (!query) {
+    navItems.forEach(function(item) { item.style.display = ''; });
+    sectionTitles.forEach(function(title) { title.style.display = ''; });
+    return;
+  }
+
+  let lastVisibleSection = null;
+  navItems.forEach(function(item) {
+    const link = item.querySelector('.sidebar__nav-link');
+    const text = (link.textContent || '').toLowerCase();
+    if (text.includes(query)) {
+      item.style.display = '';
+      lastVisibleSection = item.closest('ul');
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  sectionTitles.forEach(function(title) {
+    const nextUl = title.nextElementSibling;
+    if (nextUl && nextUl.tagName === 'UL') {
+      const hasVisible = Array.from(nextUl.querySelectorAll('.sidebar__nav-item'))
+        .some(function(item) { return item.style.display !== 'none'; });
+      title.style.display = hasVisible ? '' : 'none';
+    }
+  });
+}
+</script>
+
+</body>
+</html>
