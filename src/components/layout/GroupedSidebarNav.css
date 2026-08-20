@@ -297,6 +297,38 @@
   border-color: var(--grouped-sidebar-line);
 }
 
+.grouped-sidebar__history-item--streaming,
+.grouped-sidebar__history-popover-item--streaming,
+.grouped-sidebar__history-item--unread,
+.grouped-sidebar__history-popover-item--unread {
+  position: relative;
+  overflow: visible;
+}
+
+.grouped-sidebar__history-item--streaming::before,
+.grouped-sidebar__history-popover-item--streaming::before,
+.grouped-sidebar__history-item--unread::before,
+.grouped-sidebar__history-popover-item--unread::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  border-radius: 50%;
+  background: var(--el-color-primary, #409eff);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.2s ease;
+  transform: translateY(-50%);
+}
+
+.grouped-sidebar__history-item--streaming::before,
+.grouped-sidebar__history-popover-item--streaming::before {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--el-color-primary, #409eff) 55%, transparent);
+  animation: grouped-sidebar-history-pulse 1.15s ease-in-out infinite;
+}
+
 .grouped-sidebar__history-copy {
   min-width: 0;
   flex: 1;
@@ -313,6 +345,8 @@
   color: var(--grouped-sidebar-muted);
   background: transparent;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
   opacity: 0;
   transition:
     opacity 0.2s ease,
@@ -321,8 +355,17 @@
 }
 
 .grouped-sidebar__history-item:hover .grouped-sidebar__history-more,
-.grouped-sidebar__history-item--active .grouped-sidebar__history-more {
+.grouped-sidebar__history-item:focus-within .grouped-sidebar__history-more {
   opacity: 1;
+}
+
+.grouped-sidebar__history-item:hover::before,
+.grouped-sidebar__history-item:focus-within::before,
+.grouped-sidebar__history-popover-item:hover::before,
+.grouped-sidebar__history-popover-item:focus-within::before {
+  opacity: 0;
+  animation: none;
+  box-shadow: none;
 }
 
 .grouped-sidebar__history-more:hover {
@@ -916,6 +959,26 @@
   background: var(--grouped-sidebar-primary-soft);
 }
 
+@keyframes grouped-sidebar-history-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(0.85);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--el-color-primary, #409eff) 70%, transparent);
+  }
+  55% {
+    opacity: 0.62;
+    transform: translateY(-50%) scale(1.35);
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grouped-sidebar__history-item--streaming::before,
+  .grouped-sidebar__history-popover-item--streaming::before {
+    animation: none;
+  }
+}
+
 .grouped-sidebar__history-popover-copy {
   min-width: 0;
   flex: 1;
@@ -944,6 +1007,8 @@
   color: var(--grouped-sidebar-muted);
   background: transparent;
   cursor: pointer;
+  position: relative;
+  z-index: 1;
   opacity: 0;
   transition:
     opacity 0.2s ease,
@@ -952,8 +1017,15 @@
 }
 
 .grouped-sidebar__history-popover-item:hover .grouped-sidebar__history-popover-more,
-.grouped-sidebar__history-popover-item--active .grouped-sidebar__history-popover-more {
+.grouped-sidebar__history-popover-item:focus-within .grouped-sidebar__history-popover-more {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .grouped-sidebar__history-item--active .grouped-sidebar__history-more,
+  .grouped-sidebar__history-popover-item--active .grouped-sidebar__history-popover-more {
+    opacity: 1;
+  }
 }
 
 .grouped-sidebar__history-popover-more:hover {
@@ -1773,6 +1845,14 @@
   border-top-color: var(--app-primary, #4f7cff);
   border-radius: 50%;
   animation: groupedHistorySpin 0.6s linear infinite;
+}
+
+/* 分页 */
+.my-products-panel__pagination {
+  display: flex;
+  justify-content: center;
+  padding: 4px 12px 14px;
+  flex-shrink: 0;
 }
 
 /* 预览弹窗 */

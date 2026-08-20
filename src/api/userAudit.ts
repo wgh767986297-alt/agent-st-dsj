@@ -26,6 +26,18 @@ export interface AuditUser {
   dept_id?: number
 }
 
+/**
+ * 判断用户是否属于指定部门。
+ * getAllUserXx 的 userList[].department 是字符串类型（可能是部门 ID 的字符串形式），
+ * 而 dept/list 的 id 是数字类型，直接 `===` 比较会因类型不一致而匹配失败，
+ * 这里统一转成字符串再比较（兼容 dept_id 缺失、department 为字符串 ID 或数字 ID 的情况）。
+ */
+export function userInDept(user: AuditUser, deptId: number | string | null | undefined): boolean {
+  if (deptId == null || deptId === '') return false
+  const uid = user.dept_id ?? user.department
+  return uid != null && String(uid) === String(deptId)
+}
+
 const AUDIT_BASE_URL =
   import.meta.env.VITE_PARSE_API_URL || import.meta.env.VITE_API_URL || 'http://10.32.71.224:8080'
 

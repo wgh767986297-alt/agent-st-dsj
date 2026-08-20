@@ -206,7 +206,7 @@ const deptForm = ref({
   dept_code: '',
   admin_name: '',
   admin_id: null as number | null,
-  user_quota: 20,
+  user_quota: 100,
   authorized_skill_count: 0,
   authorized_mcp_count: 0,
   authorized_officer_count: 0,
@@ -291,7 +291,7 @@ function openAddDeptDialog() {
     dept_code: '',
     admin_name: '',
     admin_id: null,
-    user_quota: 20,
+    user_quota: 100,
     authorized_skill_count: 0,
     authorized_mcp_count: 0,
     authorized_officer_count: 0,
@@ -1419,25 +1419,25 @@ onMounted(() => {
           <input v-model="deptForm.dept_code" type="text" placeholder="例如：dept001" />
         </div>
 
-        <!-- Row 2 -->
-        <div class="ds-form-group">
-          <label class="ds-form-label">可注册配额 <span class="ds-required">*</span></label>
-          <input v-model.number="deptForm.user_quota" type="number" placeholder="20" min="1" />
-        </div>
-        <div class="ds-form-group">
-          <label class="ds-form-label">已授权Skill数</label>
-          <input v-model.number="deptForm.authorized_skill_count" type="number" placeholder="0" min="0" />
-        </div>
-
-        <!-- Row 3 -->
-        <div class="ds-form-group">
-          <label class="ds-form-label">已授权MCP服务数</label>
-          <input v-model.number="deptForm.authorized_mcp_count" type="number" placeholder="0" min="0" />
-        </div>
-        <div class="ds-form-group">
-          <label class="ds-form-label">已授权数字警员数</label>
-          <input v-model.number="deptForm.authorized_officer_count" type="number" placeholder="0" min="0" />
-        </div>
+        <!-- Row 2 & 3: 可注册配额 / 已授权Skill数 / 已授权MCP服务数 / 已授权数字警员数（已隐藏，创建时 user_quota 默认 100） -->
+        <template v-if="false">
+          <div class="ds-form-group">
+            <label class="ds-form-label">可注册配额 <span class="ds-required">*</span></label>
+            <input v-model.number="deptForm.user_quota" type="number" placeholder="20" min="1" />
+          </div>
+          <div class="ds-form-group">
+            <label class="ds-form-label">已授权Skill数</label>
+            <input v-model.number="deptForm.authorized_skill_count" type="number" placeholder="0" min="0" />
+          </div>
+          <div class="ds-form-group">
+            <label class="ds-form-label">已授权MCP服务数</label>
+            <input v-model.number="deptForm.authorized_mcp_count" type="number" placeholder="0" min="0" />
+          </div>
+          <div class="ds-form-group">
+            <label class="ds-form-label">已授权数字警员数</label>
+            <input v-model.number="deptForm.authorized_officer_count" type="number" placeholder="0" min="0" />
+          </div>
+        </template>
 
         <!-- Row 5: Full-width remark -->
         <div class="ds-form-group full">

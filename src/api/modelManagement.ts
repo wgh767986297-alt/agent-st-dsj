@@ -53,7 +53,6 @@ modelApi.interceptors.response.use(
     return response.data
   },
   (error) => {
-
     if (isAuthExpiredResponse(error.response?.data, error.response?.status)) {
       handleAuthExpired()
     }
@@ -73,14 +72,14 @@ export const getModelList = async (isAdmin?: boolean) => {
 }
 
 export const saveModel = (modelName: string, payload: Partial<ModelConfig>) => {
-  return modelApi.put<ModelChangeResponse, ModelChangeResponse>(
+  return modelApi.post<ModelChangeResponse, ModelChangeResponse>(
     `/add_model/${encodeURIComponent(modelName)}`,
     payload,
   )
 }
 
 export const updateModel = (modelName: string, payload: Partial<ModelConfig>) => {
-  return modelApi.put<ModelChangeResponse, ModelChangeResponse>(
+  return modelApi.post<ModelChangeResponse, ModelChangeResponse>(
     `/change_model/${encodeURIComponent(modelName)}`,
     payload,
   )

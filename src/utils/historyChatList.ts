@@ -2,6 +2,13 @@
 import { historyServices } from '@/api/historyChatList'
 import type { Message } from '@/types/chat'
 
+const MAX_HISTORY_TITLE_LENGTH = 20
+
+const truncateHistoryTitle = (title: string): string => {
+  if (title.length <= MAX_HISTORY_TITLE_LENGTH) return title
+  return `${title.slice(0, MAX_HISTORY_TITLE_LENGTH - 3)}...`
+}
+
 const formatBackendTime = (timeStr: string | number): string => {
   if (!timeStr) return ''
 
@@ -120,7 +127,7 @@ export const saveConversation = async (data: {
   try {
     const account = historyServices.getAccount()
     const content = serializeMessages(data.messages)
-    const title = data.title || generateTitle(data.messages)
+    const title = truncateHistoryTitle(data.title || generateTitle(data.messages))
     const qaCount = countQaMessages(data.messages)
 
     if (data.messages.length === 0) {
@@ -152,7 +159,7 @@ export const updateConversation = async (data: {
 }) => {
   try {
     const account = historyServices.getAccount()
-    const title = data.title || '未知对话'
+    const title = truncateHistoryTitle(data.title || '未知对话')
     const content = data.messages ? serializeMessages(data.messages) : ''
     const qaCount = data.messages ? countQaMessages(data.messages) : 0
 

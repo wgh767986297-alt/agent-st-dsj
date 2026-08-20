@@ -113,6 +113,9 @@
                 auditStatusText(item)
               }}</span>
             </div>
+            <div v-if="item.dept_name || item.creator_name" class="ds-card-meta">
+              {{ [item.dept_name, item.creator_name].filter(Boolean).join(' · ') }}
+            </div>
             <div v-if="hasMineMcpActions(item)" class="ds-card-actions">
               <button
                 v-if="getMineButtonVis(item).showPublish"
@@ -238,11 +241,8 @@
             <div class="ds-card-status">
               <span class="ds-tag-approved">已上架</span>
             </div>
-            <div
-              v-if="item.creator_name || item.dept_name"
-              style="font-size: 11px; color: var(--ds-text-secondary); margin-top: 4px"
-            >
-              创建者：{{ item.creator_name || '—' }} | 部门：{{ item.dept_name || '—' }}
+            <div v-if="item.dept_name || item.creator_name" class="ds-card-meta">
+              {{ [item.dept_name, item.creator_name].filter(Boolean).join(' · ') }}
             </div>
             <div v-if="isManager" class="ds-card-actions">
               <button
@@ -502,6 +502,9 @@
                         <span class="mcp-tool-desc">{{ tool.description || '暂无描述' }}</span>
                       </summary>
                       <div class="mcp-tool-schema">
+                        <div v-if="tool.description" class="mcp-tool-full-desc">
+                          {{ tool.description }}
+                        </div>
                         <pre>{{ JSON.stringify(tool.inputSchema, null, 2) }}</pre>
                       </div>
                     </details>
@@ -614,7 +617,7 @@ import {
   type PublicResourceItem,
 } from '@/api/resource'
 import { authManageApi } from '@/api/authManage'
-import { userAuditApi, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import {
   getStoredUserProfile,
@@ -962,15 +965,12 @@ watch(activeTab, () => {
 
 // ============ 通用详情（点击通用卡片 → 获取 MCP 详情） ============
 async function openGeneralDetail(item: PublicResourceItem) {
-  loading.value = true
   try {
     const res = await getMcpDetail(item.resource_id)
     detailItem.value = res.data
     detailVisible.value = true
   } catch (e) {
     ElMessage.error('获取详情失败')
-  } finally {
-    loading.value = false
   }
 }
 
@@ -1011,11 +1011,11 @@ async function openGeneralMcpAuthDialog(item: PublicResourceItem) {
 const filteredGeneralMcpAuthUsers = computed(() => {
   if (isSuperAdmin.value) {
     if (!generalMcpAuthDeptId.value) return generalMcpAuthUsers.value
-    return generalMcpAuthUsers.value.filter((u) => u.dept_id === generalMcpAuthDeptId.value)
+    return generalMcpAuthUsers.value.filter((u) => userInDept(u, generalMcpAuthDeptId.value))
   }
   const profile = getStoredUserProfile()
   const myDeptId = profile?.dept_id
-  if (myDeptId) return generalMcpAuthUsers.value.filter((u) => u.dept_id === myDeptId)
+  if (myDeptId) return generalMcpAuthUsers.value.filter((u) => userInDept(u, myDeptId))
   const myDept = profile?.department || ''
   if (!myDept) return generalMcpAuthUsers.value
   return generalMcpAuthUsers.value.filter((u) => (u.department || '') === myDept)
@@ -1228,6 +1228,15 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mcp-tool-full-desc {
+  font-size: 12px;
+  color: var(--ds-text-secondary);
+  line-height: 1.6;
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .mcp-tool-schema {

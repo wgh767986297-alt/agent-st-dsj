@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, computed, nextTick, watch } from 'vue'
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  onActivated,
+  onDeactivated,
+  computed,
+  nextTick,
+  watch,
+} from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -33,7 +42,7 @@ import {
   Document,
   Loading,
 } from '@element-plus/icons-vue'
-import type { HistoryItem, Message } from '@/types/chat'
+import type { GroupChatContext, GroupChatRunStatus, HistoryItem, Message } from '@/types/chat'
 import ActionDialog from '@/components/common/ActionDialog.vue'
 import { skillManageApi, type SkillItem as SkillManageItem } from '@/api/skillManage'
 import { getModelList, type ModelConfig } from '@/api/modelManagement'
@@ -45,6 +54,7 @@ import SkillsMarketView from '@/views/SkillsMarketView.vue'
 import McpManagementView from '@/views/McpManagementView.vue'
 import { type McpServiceItem } from '@/api/mcpService'
 import { officerApi, type OfficerItem } from '@/api/officer'
+import { multiAgentApi, type GroupDetail } from '@/api/multiAgent'
 import { getMyResources } from '@/api/resource'
 import { useScrollManager } from '@/composables/useScrollManager'
 import { useLongPress } from '@/composables/useLongPress'
@@ -66,9 +76,7 @@ const router = useRouter()
 const route = useRoute()
 
 // Sidebar — only show on chat (做一做) routes
-const isChatView = computed(
-  () => !['/skills-market', '/mcp-management'].includes(route.path),
-)
+const isChatView = computed(() => !['/skills-market', '/mcp-management'].includes(route.path))
 const sidebarTooltipProps = {
   placement: 'right' as const,
   trigger: 'hover' as const,
@@ -222,10 +230,142 @@ const toggleOfficer = (officer: OfficerItem) => {
 const removeOfficer = (id: number) => {
   selectedOfficers.value = selectedOfficers.value.filter((o) => o.id !== id)
 }
+
+// 多智能体群聊
+const groupChatDialogVisible = ref(false)
+const groupCreateSubmitting = ref(false)
+const groupTopic = ref('')
+const selectedGroupOfficerIds = ref<number[]>([])
+
+const activeGroupChat = computed<GroupChatContext | null>(() => {
+  for (let index = chatStore.messages.length - 1; index >= 0; index--) {
+    const context = chatStore.messages[index]?.groupChat
+    if (context) return context
+  }
+  return null
+})
+
+const activeGroupRunStatus = computed<GroupChatRunStatus | null>(() => {
+  for (let index = chatStore.messages.length - 1; index >= 0; index--) {
+    const status = chatStore.messages[index]?.groupRunStatus
+    if (status) return status
+  }
+  return null
+})
+
+const groupRunStatusText = computed(() => {
+  const statusMap: Record<GroupChatRunStatus, string> = {
+    running: '协作处理中',
+    waiting_user: '等待补充信息',
+    completed: '协作完成',
+    failed: '本轮执行失败',
+  }
+  return activeGroupRunStatus.value ? statusMap[activeGroupRunStatus.value] : '群聊进行中'
+})
+
+const selectedGroupOfficers = computed(() => {
+  const selectedIds = new Set(selectedGroupOfficerIds.value)
+  return officerList.value.filter((officer) => selectedIds.has(officer.id))
+})
+
+const openGroupChatDialog = () => {
+  if (chatStore.isStreaming || chatStore.isTyping) {
+    ElMessage.info('当前回答进行中，请等待结束后再创建群聊')
+    return
+  }
+  groupTopic.value = ''
+  selectedGroupOfficerIds.value = []
+  groupChatDialogVisible.value = true
+  loadOfficerList()
+}
+
+const toggleGroupOfficer = (officer: OfficerItem) => {
+  if (groupCreateSubmitting.value) return
+  if (selectedGroupOfficerIds.value.includes(officer.id)) {
+    selectedGroupOfficerIds.value = selectedGroupOfficerIds.value.filter((id) => id !== officer.id)
+  } else {
+    selectedGroupOfficerIds.value.push(officer.id)
+  }
+}
+
+const buildGroupChatContext = (
+  group: GroupDetail,
+  fallbackOfficers: OfficerItem[],
+): GroupChatContext => {
+  const responseMembers: GroupChatContext['members'] = (group.members || []).map((member) => ({
+    id: member.id,
+    name: member.name,
+    roleName: member.role_name,
+    description: member.description,
+    isManager: member.id === group.manager_employee_id || member.is_manager,
+  }))
+  const fallbackMembers: GroupChatContext['members'] = fallbackOfficers.map((officer) => ({
+    id: String(officer.id),
+    name: officer.officer_name,
+    roleName: officer.officer_code,
+    description: officer.description,
+  }))
+  const members = responseMembers.length > 0 ? responseMembers : fallbackMembers
+  return {
+    id: group.id,
+    name: group.name,
+    purpose: group.purpose,
+    managerEmployeeId: group.manager_employee_id,
+    managerName:
+      group.manager_name ||
+      members.find((member) => member.id === group.manager_employee_id)?.name ||
+      '群管理员',
+    members,
+  }
+}
+
+const handleCreateGroupChat = async () => {
+  const topic = groupTopic.value.trim()
+  if (!topic) {
+    ElMessage.warning('请输入群聊主题')
+    return
+  }
+  if (selectedGroupOfficerIds.value.length === 0) {
+    ElMessage.warning('请至少选择一名数字警员')
+    return
+  }
+
+  groupCreateSubmitting.value = true
+  try {
+    const fallbackOfficers = selectedGroupOfficers.value.map((officer) => ({ ...officer }))
+    const group = await multiAgentApi.createAutoGroup({
+      description: topic,
+      candidate_employee_ids: [...selectedGroupOfficerIds.value],
+      max_rounds: 3,
+      max_tasks_per_round: 8,
+    })
+    const groupContext = buildGroupChatContext(group, fallbackOfficers)
+
+    await handleNewChat()
+    currentInput.value = ''
+    selectedSkills.value = []
+    selectedOfficers.value = []
+    selectedMcps.value = []
+    groupChatDialogVisible.value = false
+    groupCreateSubmitting.value = false
+
+    await nextTick()
+    await chatStore.sendGroupMessage(groupContext, topic)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '群聊创建失败')
+  } finally {
+    groupCreateSubmitting.value = false
+  }
+}
+
 let skillSearchTimer: number | null = null
 let skillSearchRequestId = 0
 const messagesAreaRef = ref<HTMLDivElement | null>(null)
 const activeMessageId = ref<string | null>(null)
+const conversationScrollPositions = new Map<string, number>()
+const isRestoringHistoryScroll = ref(false)
+let historySwitchVersion = 0
+let historyScrollRestoreTimer: number | null = null
 const attachmentDialogVisible = ref(false)
 
 // ============ 我的产物（右侧挤压面板） ============
@@ -276,16 +416,66 @@ const getMyProductFileType = (fileName: string): string => {
 const getMyProductTagStyle = (fileName: string) => {
   const type = getMyProductFileType(fileName)
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    image: { label: '图片', color: '#166534', bg: 'rgba(22,101,52,0.08)', border: 'rgba(22,101,52,0.18)' },
-    pdf: { label: 'PDF', color: '#991b1b', bg: 'rgba(153,27,27,0.08)', border: 'rgba(153,27,27,0.18)' },
-    docx: { label: 'DOCX', color: '#1a56b8', bg: 'rgba(26,86,184,0.08)', border: 'rgba(26,86,184,0.18)' },
-    xlsx: { label: 'XLSX', color: '#0d7a3e', bg: 'rgba(13,122,62,0.08)', border: 'rgba(13,122,62,0.18)' },
-    video: { label: '视频', color: '#1e3a5f', bg: 'rgba(30,58,95,0.08)', border: 'rgba(30,58,95,0.18)' },
-    audio: { label: '音频', color: '#6b21a8', bg: 'rgba(107,33,168,0.08)', border: 'rgba(107,33,168,0.18)' },
-    html: { label: 'HTML', color: '#0d6b6d', bg: 'rgba(13,107,109,0.08)', border: 'rgba(13,107,109,0.18)' },
-    text: { label: '文本', color: '#374151', bg: 'rgba(55,65,81,0.08)', border: 'rgba(55,65,81,0.18)' },
-    office: { label: '文档', color: '#92400e', bg: 'rgba(146,64,14,0.08)', border: 'rgba(146,64,14,0.18)' },
-    other: { label: '其他', color: '#475569', bg: 'rgba(71,85,105,0.08)', border: 'rgba(71,85,105,0.18)' },
+    image: {
+      label: '图片',
+      color: '#166534',
+      bg: 'rgba(22,101,52,0.08)',
+      border: 'rgba(22,101,52,0.18)',
+    },
+    pdf: {
+      label: 'PDF',
+      color: '#991b1b',
+      bg: 'rgba(153,27,27,0.08)',
+      border: 'rgba(153,27,27,0.18)',
+    },
+    docx: {
+      label: 'DOCX',
+      color: '#1a56b8',
+      bg: 'rgba(26,86,184,0.08)',
+      border: 'rgba(26,86,184,0.18)',
+    },
+    xlsx: {
+      label: 'XLSX',
+      color: '#0d7a3e',
+      bg: 'rgba(13,122,62,0.08)',
+      border: 'rgba(13,122,62,0.18)',
+    },
+    video: {
+      label: '视频',
+      color: '#1e3a5f',
+      bg: 'rgba(30,58,95,0.08)',
+      border: 'rgba(30,58,95,0.18)',
+    },
+    audio: {
+      label: '音频',
+      color: '#6b21a8',
+      bg: 'rgba(107,33,168,0.08)',
+      border: 'rgba(107,33,168,0.18)',
+    },
+    html: {
+      label: 'HTML',
+      color: '#0d6b6d',
+      bg: 'rgba(13,107,109,0.08)',
+      border: 'rgba(13,107,109,0.18)',
+    },
+    text: {
+      label: '文本',
+      color: '#374151',
+      bg: 'rgba(55,65,81,0.08)',
+      border: 'rgba(55,65,81,0.18)',
+    },
+    office: {
+      label: '文档',
+      color: '#92400e',
+      bg: 'rgba(146,64,14,0.08)',
+      border: 'rgba(146,64,14,0.18)',
+    },
+    other: {
+      label: '其他',
+      color: '#475569',
+      bg: 'rgba(71,85,105,0.08)',
+      border: 'rgba(71,85,105,0.18)',
+    },
   }
   return map[type] || map.other
 }
@@ -294,10 +484,11 @@ const getMyProductTagStyle = (fileName: string) => {
 const myProductsFiltered = computed(() => {
   const keyword = myProductsKeyword.value.trim().toLowerCase()
   if (!keyword) return myProductsList.value
-  return myProductsList.value.filter((item) =>
-    item.file_name.toLowerCase().includes(keyword),
-  )
+  return myProductsList.value.filter((item) => item.file_name.toLowerCase().includes(keyword))
 })
+
+/** 总页数 */
+const myProductsTotalPages = computed(() => Math.ceil(myProductsTotal.value / pageSize))
 
 /** 加载附件列表（根据当前 tab 调用不同接口） */
 const fetchMyProductsAttachments = async (page: number = 1) => {
@@ -331,6 +522,11 @@ const fetchMyProductsAttachments = async (page: number = 1) => {
   } finally {
     myProductsLoading.value = false
   }
+}
+
+/** 翻页 */
+const handleMyProductsPageChange = (page: number) => {
+  fetchMyProductsAttachments(page)
 }
 
 /** 切换 tab */
@@ -405,8 +601,11 @@ const decodeTextBuffer = (buffer: ArrayBuffer, contentType: string | null): stri
   const unique = [...new Set(labels)]
   const countBad = (t: string) => (t.match(/�/g) || []).length
   const candidates = unique.flatMap((label) => {
-    try { return [{ label, text: new TextDecoder(label).decode(buffer) }] }
-    catch { return [] }
+    try {
+      return [{ label, text: new TextDecoder(label).decode(buffer) }]
+    } catch {
+      return []
+    }
   })
   if (candidates.length === 0) return new TextDecoder().decode(buffer)
   return candidates.sort((a, b) => countBad(a.text) - countBad(b.text))[0].text
@@ -518,7 +717,13 @@ watch(
 )
 
 // 打字机效果
-const welcomeFullText = '今天，有什么新想法？'
+const welcomeTexts = [
+  '今天，有什么新想法？',
+  '准备好一起解决问题了吗？',
+  '说说看，今天想完成什么？',
+  '需要我帮你梳理哪些信息？',
+  '从一个想法开始吧。',
+]
 const welcomeDisplayedText = ref('')
 const welcomeTypingDone = ref(false)
 let welcomeTypingTimer: number | null = null
@@ -529,6 +734,7 @@ const startWelcomeTyping = () => {
   }
   welcomeDisplayedText.value = ''
   welcomeTypingDone.value = false
+  const welcomeFullText = welcomeTexts[Math.floor(Math.random() * welcomeTexts.length)]
   let index = 0
   const typeNext = () => {
     if (index < welcomeFullText.length) {
@@ -595,6 +801,11 @@ const handleChatTouchMove = (event: TouchEvent) => {
   }
 }
 const handleChatScrollbarScroll = () => {
+  const historyId = chatStore.currentHistoryId
+  const wrapRef = chatContainer.value?.wrapRef
+  if (historyId && wrapRef && !isRestoringHistoryScroll.value) {
+    conversationScrollPositions.set(historyId, wrapRef.scrollTop)
+  }
   updateChatScrollState()
   updateActiveMessageFromScroll()
 }
@@ -610,9 +821,19 @@ const formatUserMessageTime = (timestamp: number) => {
   if (Number.isNaN(date.getTime())) {
     return ''
   }
+  const today = new Date()
   const hours = String(date.getHours()).padStart(2, '0')
   const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${hours}:${minutes}`
+  if (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  ) {
+    return `${hours}:${minutes}`
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}-${day} ${hours}:${minutes}`
 }
 
 const hasInput = computed(() => currentInput.value.trim().length > 0)
@@ -703,7 +924,11 @@ const loadSkillSuggestions = async (query: string) => {
   const requestId = ++skillSearchRequestId
   skillSuggestLoading.value = true
   try {
-    const { list } = await skillManageApi.list({ keyword: query || undefined, limit: 5, is_public: true })
+    const { list } = await skillManageApi.list({
+      keyword: query || undefined,
+      limit: 5,
+      is_public: true,
+    })
     if (requestId !== skillSearchRequestId) return
     const nextSuggestions = list
       .map(normalizeSkillItem)
@@ -814,7 +1039,7 @@ const handleScrollToBottomClick = async () => {
   if (!wrapRef) return
   wrapRef.scrollTo({
     top: wrapRef.scrollHeight,
-    behavior: 'auto',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
   })
   isUserScrolling.value = false
   isAtBottom.value = true
@@ -833,25 +1058,21 @@ const isLastAssistantMessage = (msg: Message): boolean => {
 
 const scrollToMessage = (id: string) => {
   const element = document.getElementById(`msg-${id}`)
-  if (element) {
-    activeMessageId.value = id
-    requestAnimationFrame(() => {
-      element.scrollIntoView({ behavior: 'auto', block: 'start' })
-      setTimeout(() => {
-        const currentElement = document.getElementById(`msg-${id}`)
-        if (currentElement) {
-          const container = chatContainer.value?.wrapRef
-          if (container) {
-            const elementTop = currentElement.offsetTop
-            const scrollTop = container.scrollTop
-            if (Math.abs(elementTop - scrollTop) > 50) {
-              currentElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            }
-          }
-        }
-      }, 100)
-    })
-  }
+  const container = chatContainer.value?.wrapRef
+  if (!element || !container) return
+
+  activeMessageId.value = id
+  const targetTop = Math.max(
+    0,
+    container.scrollTop +
+      element.getBoundingClientRect().top -
+      container.getBoundingClientRect().top -
+      16,
+  )
+  container.scrollTo({
+    top: targetTop,
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  })
 }
 
 const handleExpandChange = () => {
@@ -882,12 +1103,16 @@ const updateActiveMessageFromScroll = () => {
   }
   const containerRect = wrapRef.getBoundingClientRect()
   const activationLine = containerRect.top + Math.min(wrapRef.clientHeight * 0.35, 180)
-  let activeElement = userMsgElements[0]
-  for (const element of userMsgElements) {
-    if (element.getBoundingClientRect().top <= activationLine) {
-      activeElement = element
-    } else {
-      break
+  let activeElement = checkIsAtBottom(wrapRef)
+    ? userMsgElements[userMsgElements.length - 1]
+    : userMsgElements[0]
+  if (!checkIsAtBottom(wrapRef)) {
+    for (const element of userMsgElements) {
+      if (element.getBoundingClientRect().top <= activationLine) {
+        activeElement = element
+      } else {
+        break
+      }
     }
   }
   const id = getMessageIdFromElement(activeElement)
@@ -916,7 +1141,25 @@ watch(currentInput, (newVal) => {
 })
 
 const sendCurrentMessage = async () => {
+  if (chatStore.isStreaming || chatStore.isTyping) {
+    ElMessage.info('当前回答进行中，请等待结束后再发送新消息')
+    return
+  }
+
   const message = currentInput.value.trim()
+  if (activeGroupChat.value && message) {
+    currentInput.value = ''
+    isUserScrolling.value = false
+    isAtBottom.value = true
+    scrollToBottom(chatContainer.value?.wrapRef)
+    await chatStore.sendGroupMessage(activeGroupChat.value, message)
+    await nextTick()
+    if (!isUserScrolling.value) {
+      scrollToBottom(chatContainer.value?.wrapRef)
+    }
+    return
+  }
+
   const skillsForMessage = selectedSkills.value.map((skill) => ({ ...skill }))
   let apiMessage = message
 
@@ -924,9 +1167,12 @@ const sendCurrentMessage = async () => {
   const officerPrompts = selectedOfficers.value
     .map((o) => {
       const cfg = o.config as Record<string, unknown> | undefined
-      return (typeof cfg?.systemPrompt === 'string' && cfg.systemPrompt)
-        || (typeof cfg?.prompt === 'string' && cfg.prompt)
-        || ''
+      return (
+        (typeof o.system_prompt === 'string' && o.system_prompt) ||
+        (typeof cfg?.systemPrompt === 'string' && cfg.systemPrompt) ||
+        (typeof cfg?.prompt === 'string' && cfg.prompt) ||
+        ''
+      )
     })
     .filter(Boolean)
   if (officerPrompts.length > 0) {
@@ -950,7 +1196,7 @@ const sendCurrentMessage = async () => {
 
     if (selectedOfficers.value.length > 0) {
       const officerResources = await Promise.allSettled(
-        selectedOfficers.value.map(o => officerApi.getResources(o.id))
+        selectedOfficers.value.map((o) => officerApi.getResources(o.id)),
       )
       selectedOfficers.value.forEach((o, i) => {
         const result = officerResources[i]
@@ -976,7 +1222,7 @@ const sendCurrentMessage = async () => {
     }
 
     // 收集直接选中的 MCP（展示用 + 标识符）
-    const mcpsForMessage: Message['mcps'] = selectedMcps.value.map(m => {
+    const mcpsForMessage: Message['mcps'] = selectedMcps.value.map((m) => {
       mcpIdentifiers.push(String(m.id))
       return {
         id: m.id,
@@ -1016,12 +1262,22 @@ const sendCurrentMessage = async () => {
 }
 
 const handleQuickStart = async (question: string) => {
+  const normalizedQuestion = question.replace(/^\s*\d+\s*[、.．)）]\s*/, '').trim()
+  if (!normalizedQuestion) return
+
+  if (chatStore.isStreaming || chatStore.isTyping) {
+    currentInput.value = ''
+    await nextTick()
+    currentInput.value = normalizedQuestion
+    ElMessage.info('已将建议填入输入框，当前回答结束后可继续发送')
+    return
+  }
   // 发送新消息时重置滚动状态，确保流式输出能正常自动滚动
   isUserScrolling.value = false
   isAtBottom.value = true
   scrollToBottom(chatContainer.value?.wrapRef)
 
-  await chatStore.sendMessage(question, undefined, {
+  await chatStore.sendMessage(normalizedQuestion, undefined, {
     modelName: resolveSelectedModelName() || null,
   })
   await nextTick()
@@ -1057,6 +1313,10 @@ const copyMessage = async (msg: any) => {
 }
 
 const regenerateResponse = async (msg: any) => {
+  if (chatStore.isStreaming || chatStore.isTyping) {
+    ElMessage.info('当前回答进行中，请等待结束后再重新回答')
+    return
+  }
   if (msg.role !== 'assistant') return
   const messageIndex = chatStore.messages.findIndex((m) => m.id === msg.id)
   if (messageIndex === -1) return
@@ -1188,10 +1448,24 @@ const handleHistoryClick = (history: HistoryItem, event?: MouseEvent | TouchEven
     longPressId.value = null
     return
   }
+  const currentHistoryId = chatStore.currentHistoryId
+  const wrapRef = chatContainer.value?.wrapRef
+  if (currentHistoryId && wrapRef) {
+    conversationScrollPositions.set(currentHistoryId, wrapRef.scrollTop)
+  }
+  const switchVersion = ++historySwitchVersion
+  isRestoringHistoryScroll.value = true
+  if (historyScrollRestoreTimer !== null) {
+    window.clearTimeout(historyScrollRestoreTimer)
+    historyScrollRestoreTimer = null
+  }
   try {
     chatStore
       .loadHistory(history)
       .then(async () => {
+        if (switchVersion !== historySwitchVersion || chatStore.currentHistoryId !== history.id) {
+          return
+        }
         await nextTick()
         if (messageObserver) {
           messageObserver.disconnect()
@@ -1203,16 +1477,49 @@ const handleHistoryClick = (history: HistoryItem, event?: MouseEvent | TouchEven
         } else {
           activeMessageId.value = null
         }
-        scrollToBottom(chatContainer.value?.wrapRef)
+        const container = chatContainer.value?.wrapRef
+        const savedScrollTop = conversationScrollPositions.get(history.id)
+        if (container) {
+          requestAnimationFrame(() => {
+            if (savedScrollTop !== undefined) {
+              container.scrollTo({
+                top: savedScrollTop,
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                  ? 'auto'
+                  : 'smooth',
+              })
+            } else {
+              const shouldAnimate = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: shouldAnimate ? 'smooth' : 'auto',
+              })
+            }
+            requestAnimationFrame(() => {
+              updateChatScrollState()
+              updateActiveMessageFromScroll()
+            })
+            historyScrollRestoreTimer = window.setTimeout(() => {
+              isRestoringHistoryScroll.value = false
+              historyScrollRestoreTimer = null
+            }, 450)
+          })
+        } else {
+          isRestoringHistoryScroll.value = false
+        }
         await nextTick()
         setTimeout(() => {
           observeMessages()
         }, 300)
       })
       .catch((err: any) => {
+        if (switchVersion === historySwitchVersion) {
+          isRestoringHistoryScroll.value = false
+        }
         ElMessage.error('切换对话失败')
       })
   } catch (err) {
+    isRestoringHistoryScroll.value = false
     ElMessage.error('切换对话失败')
   }
 }
@@ -1282,6 +1589,12 @@ const initMessageObserver = () => {
     threshold: 0,
   }
   messageObserver = new IntersectionObserver((entries) => {
+    const wrapRef = chatContainer.value?.wrapRef
+    if (wrapRef && checkIsAtBottom(wrapRef)) {
+      const lastUserMessage = userMessages.value[userMessages.value.length - 1]
+      if (lastUserMessage) activeMessageId.value = lastUserMessage.id
+      return
+    }
     const visibleEntries = entries.filter((entry) => entry.isIntersecting)
     if (visibleEntries.length > 0) {
       const topMostEntry = visibleEntries.reduce((prev, current) => {
@@ -1322,7 +1635,7 @@ watch(
 watch(
   () => chatStore.messages,
   (newMessages) => {
-    if (newMessages.length > 0) {
+    if (newMessages.length > 0 && !isRestoringHistoryScroll.value) {
       if (scrollMessageRAF) {
         cancelAnimationFrame(scrollMessageRAF)
       }
@@ -1369,6 +1682,10 @@ onUnmounted(() => {
   if (welcomeTypingTimer !== null) {
     window.clearTimeout(welcomeTypingTimer)
     welcomeTypingTimer = null
+  }
+  if (historyScrollRestoreTimer !== null) {
+    window.clearTimeout(historyScrollRestoreTimer)
+    historyScrollRestoreTimer = null
   }
   const wrapRef = chatContainer.value?.wrapRef
   if (wrapRef) {
@@ -1460,6 +1777,25 @@ onActivated(async () => {
           </button>
         </el-tooltip>
 
+        <!-- 发起群聊（已隐藏入口） -->
+        <el-tooltip
+          v-if="false"
+          content="发起群聊"
+          v-bind="sidebarTooltipProps"
+          :disabled="!sidebarStore.collapsed"
+        >
+          <button
+            v-if="!chatStore.isHistoryRefreshing"
+            class="grouped-sidebar__nav-btn"
+            type="button"
+            :aria-expanded="groupChatDialogVisible"
+            @click="openGroupChatDialog"
+          >
+            <el-icon :size="18"><Connection /></el-icon>
+            <span v-if="!sidebarStore.collapsed">发起群聊</span>
+          </button>
+        </el-tooltip>
+
         <!-- 我的产物 -->
         <el-tooltip
           content="我的产物"
@@ -1478,7 +1814,17 @@ onActivated(async () => {
         </el-tooltip>
 
         <!-- 历史对话 -->
-        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__section-title">历史对话</div>
+        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__section-title">
+          <span>历史对话</span>
+          <button
+            v-if="chatStore.historyList.length > 10"
+            class="grouped-sidebar__section-title-collapse"
+            type="button"
+            @click="chatStore.collapseHistoryList()"
+          >
+            收起
+          </button>
+        </div>
 
         <!-- 收起时的历史记录弹窗 -->
         <el-popover
@@ -1506,6 +1852,12 @@ onActivated(async () => {
                 :class="{
                   'grouped-sidebar__history-popover-item--active':
                     history.id === chatStore.currentHistoryId,
+                  'grouped-sidebar__history-popover-item--streaming': chatStore.isHistoryProcessing(
+                    history.id,
+                  ),
+                  'grouped-sidebar__history-popover-item--unread': chatStore.isHistoryUnread(
+                    history.id,
+                  ),
                 }"
                 @click="handleSidebarHistoryClick(history)"
               >
@@ -1602,6 +1954,8 @@ onActivated(async () => {
             class="grouped-sidebar__history-item"
             :class="{
               'grouped-sidebar__history-item--active': history.id === chatStore.currentHistoryId,
+              'grouped-sidebar__history-item--streaming': chatStore.isHistoryProcessing(history.id),
+              'grouped-sidebar__history-item--unread': chatStore.isHistoryUnread(history.id),
             }"
             @click="handleHistoryClick(history)"
           >
@@ -1648,6 +2002,14 @@ onActivated(async () => {
               </template>
             </el-popover>
           </div>
+          <button
+            v-if="chatStore.historyHasMore"
+            class="grouped-sidebar__history-load-more"
+            type="button"
+            @click="chatStore.loadMoreHistory()"
+          >
+            查看更多
+          </button>
         </el-scrollbar>
       </div>
     </aside>
@@ -1674,13 +2036,116 @@ onActivated(async () => {
       @confirm="handleSidebarRenameConfirm"
     />
 
+    <!-- 新建群聊弹窗 -->
+    <el-dialog
+      v-model="groupChatDialogVisible"
+      title="发起群聊"
+      width="680px"
+      align-center
+      append-to-body
+      destroy-on-close
+      class="ds-modal group-chat-dialog"
+      :close-on-click-modal="!groupCreateSubmitting"
+      :close-on-press-escape="!groupCreateSubmitting"
+      :show-close="!groupCreateSubmitting"
+    >
+      <div class="group-chat-form" :aria-busy="groupCreateSubmitting">
+        <div class="group-chat-form__field">
+          <label for="group-chat-topic" class="group-chat-form__label">
+            <span>群聊主题</span>
+          </label>
+          <el-input
+            id="group-chat-topic"
+            v-model="groupTopic"
+            type="textarea"
+            :rows="3"
+            :maxlength="500"
+            show-word-limit
+            resize="none"
+            :disabled="groupCreateSubmitting"
+            placeholder="请输入需要数字警员共同完成的任务或问题"
+          />
+        </div>
+
+        <div class="group-chat-form__field">
+          <div class="group-chat-form__label">
+            <span>选择数字警员</span>
+            <span class="group-chat-form__selection">
+              已选择 {{ selectedGroupOfficerIds.length }} 人
+            </span>
+          </div>
+
+          <div v-if="officerListLoading" class="group-employee-state">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>正在加载数字警员...</span>
+          </div>
+          <div v-else-if="officerList.length === 0" class="group-employee-state">
+            暂无可加入群聊的数字警员
+          </div>
+          <div v-else class="group-employee-list" role="group" aria-label="可选数字警员">
+            <button
+              v-for="officer in officerList"
+              :key="officer.id"
+              type="button"
+              class="group-employee-card"
+              :class="{
+                'group-employee-card--selected': selectedGroupOfficerIds.includes(officer.id),
+              }"
+              :aria-pressed="selectedGroupOfficerIds.includes(officer.id)"
+              :disabled="groupCreateSubmitting"
+              @click="toggleGroupOfficer(officer)"
+            >
+              <span class="group-employee-card__avatar" aria-hidden="true">
+                {{ officer.officer_name.slice(0, 1) }}
+              </span>
+              <span class="group-employee-card__body">
+                <span class="group-employee-card__title-row">
+                  <strong>{{ officer.officer_name }}</strong>
+                </span>
+                <span v-if="officer.officer_code" class="group-employee-card__role">
+                  {{ officer.officer_code }}
+                </span>
+                <span v-if="officer.description" class="group-employee-card__description">
+                  {{ officer.description }}
+                </span>
+              </span>
+              <span
+                class="group-employee-card__check"
+                :class="{
+                  'group-employee-card__check--selected': selectedGroupOfficerIds.includes(
+                    officer.id,
+                  ),
+                }"
+                aria-hidden="true"
+              >
+                <el-icon v-if="selectedGroupOfficerIds.includes(officer.id)"><Check /></el-icon>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="group-chat-dialog__footer">
+          <el-button :disabled="groupCreateSubmitting" @click="groupChatDialogVisible = false">
+            取消
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="groupCreateSubmitting"
+            :disabled="officerListLoading || officerList.length === 0"
+            @click="handleCreateGroupChat"
+          >
+            {{ groupCreateSubmitting ? '正在组建团队' : '创建群聊' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 主内容区 -->
     <main class="main-content">
       <!-- 技能库视图（嵌入 main-content） -->
-      <div
-        v-if="route.path === '/skills-market'"
-        class="sched-embedded skills-market-embedded"
-      >
+      <div v-if="route.path === '/skills-market'" class="sched-embedded skills-market-embedded">
         <SkillsMarketView embedded />
       </div>
 
@@ -1701,6 +2166,41 @@ onActivated(async () => {
           mode="dialog"
           @quote="handleQuoteAppendix"
         />
+
+        <!-- 群聊上下文：随历史消息恢复 -->
+        <section v-if="activeGroupChat" class="group-chat-context" aria-label="当前群聊信息">
+          <div class="group-chat-context__main">
+            <span class="group-chat-context__icon" aria-hidden="true">
+              <el-icon><Connection /></el-icon>
+            </span>
+            <div class="group-chat-context__copy">
+              <div class="group-chat-context__title-row">
+                <strong>{{ activeGroupChat.name }}</strong>
+                <span
+                  class="group-chat-context__status"
+                  :class="`group-chat-context__status--${activeGroupRunStatus || 'idle'}`"
+                >
+                  {{ groupRunStatusText }}
+                </span>
+              </div>
+              <p>群聊模式 · {{ activeGroupChat.purpose }}</p>
+            </div>
+          </div>
+          <div class="group-chat-context__members" aria-label="群聊数字警员">
+            <span
+              v-for="member in activeGroupChat.members"
+              :key="member.id"
+              class="group-chat-member"
+              :title="member.description || member.roleName || member.name"
+            >
+              <span class="group-chat-member__avatar" aria-hidden="true">
+                {{ member.name.slice(0, 1) }}
+              </span>
+              <span class="group-chat-member__name">{{ member.name }}</span>
+              <span v-if="member.isManager" class="group-chat-member__manager">管理员</span>
+            </span>
+          </div>
+        </section>
 
         <!-- 聊天区域 -->
         <el-scrollbar
@@ -1771,10 +2271,17 @@ onActivated(async () => {
                     />
                   </div>
                   <div class="message-content">
+                    <div
+                      v-if="msg.role === 'assistant' && msg.groupChat && msg.senderName"
+                      class="group-message-sender"
+                    >
+                      {{ msg.senderName }}
+                    </div>
                     <div v-if="msg.role === 'user'" class="message-text user-text">
                       <SmartMessageRenderer
                         :message="msg"
                         :is-streaming="false"
+                        :is-answer-in-progress="chatStore.isStreaming || chatStore.isTyping"
                         @expand-change="handleExpandChange"
                         @send-message="handleQuickStart"
                       />
@@ -1784,6 +2291,7 @@ onActivated(async () => {
                       <SmartMessageRenderer
                         :message="msg"
                         :is-streaming="chatStore.isStreaming && isLastAssistantMessage(msg)"
+                        :is-answer-in-progress="chatStore.isStreaming || chatStore.isTyping"
                         @expand-change="handleExpandChange"
                         @send-message="handleQuickStart"
                       />
@@ -1811,12 +2319,7 @@ onActivated(async () => {
                       :content="msg.role === 'user' ? '复制消息' : '复制回答'"
                       placement="top"
                     >
-                      <el-button
-                        size="small"
-                        link
-                        @click="copyMessage(msg)"
-                        class="action-btn"
-                      >
+                      <el-button size="small" link @click="copyMessage(msg)" class="action-btn">
                         <el-icon size="16"><CopyDocument /></el-icon>
                       </el-button>
                     </el-tooltip>
@@ -1833,6 +2336,7 @@ onActivated(async () => {
                       <el-button
                         size="small"
                         link
+                        :disabled="chatStore.isStreaming || chatStore.isTyping"
                         @click="regenerateResponse(msg)"
                         class="action-btn"
                       >
@@ -1872,9 +2376,8 @@ onActivated(async () => {
 
         <!-- 底部区域：选择区 + 输入框 -->
         <div class="bottom-section">
-
           <!-- 警员 / MCP 选择区 -->
-          <div class="resource-select-bar">
+          <div v-if="!activeGroupChat" class="resource-select-bar">
             <!-- 左侧：数字警员 -->
             <div class="resource-select-half">
               <div class="resource-select-label">数字警员</div>
@@ -2021,7 +2524,14 @@ onActivated(async () => {
                     type="textarea"
                     :rows="1"
                     :autosize="{ minRows: 1, maxRows: 4 }"
-                    placeholder="Enter 发送，Shift+Enter 换行"
+                    :placeholder="
+                      activeGroupChat
+                        ? '向群聊继续提问，Enter 发送'
+                        : 'Enter 发送，Shift+Enter 换行'
+                    "
+                    :disabled="
+                      Boolean(activeGroupChat) && (chatStore.isStreaming || chatStore.isTyping)
+                    "
                     @keydown.enter.exact.prevent="sendCurrentMessage"
                     @paste="handleInputPaste"
                     class="message-input"
@@ -2032,6 +2542,7 @@ onActivated(async () => {
                 <div class="input-actions-row">
                   <!-- 上传按钮 - 最左侧 -->
                   <el-tooltip
+                    v-if="!activeGroupChat"
                     content="支持 图片、PDF、Word、Excel、CSV、TXT、MD 格式文件"
                     placement="top"
                     :show-after="300"
@@ -2048,6 +2559,7 @@ onActivated(async () => {
                   <div class="input-actions-right">
                     <!-- 模型切换按钮 -->
                     <el-popover
+                      v-if="!activeGroupChat"
                       v-model:visible="modelPopoverVisible"
                       placement="top-start"
                       trigger="click"
@@ -2101,14 +2613,26 @@ onActivated(async () => {
                     <!-- 发送按钮 -->
                     <el-button
                       class="send-btn"
-                      :class="{ 'send-btn--active': hasInput }"
+                      :class="{ 'send-btn--active': hasInput || chatStore.isStreaming }"
                       type="primary"
+                      :disabled="
+                        Boolean(activeGroupChat) && (chatStore.isStreaming || chatStore.isTyping)
+                      "
                       @click="
-                        chatStore.isStreaming ? chatStore.stopStreaming() : sendCurrentMessage()
+                        chatStore.isStreaming && !activeGroupChat
+                          ? chatStore.stopStreaming()
+                          : sendCurrentMessage()
                       "
                     >
+                      <el-icon
+                        v-if="activeGroupChat && (chatStore.isStreaming || chatStore.isTyping)"
+                        class="is-loading"
+                        :size="18"
+                      >
+                        <Loading />
+                      </el-icon>
                       <img
-                        v-if="showStopIcon"
+                        v-else-if="showStopIcon"
                         src="@/assets/icons/chat/icon-chat-stop.png"
                         alt="停止"
                         style="width: 18px; height: 18px"
@@ -2147,11 +2671,7 @@ onActivated(async () => {
 
     <!-- 我的产物面板（右侧挤压主内容区） -->
     <Transition name="slide-panel">
-      <aside
-        v-if="isChatView && myProductsVisible"
-        class="my-products-panel"
-        aria-label="我的产物"
-      >
+      <aside v-if="isChatView && myProductsVisible" class="my-products-panel" aria-label="我的产物">
         <!-- 头部 -->
         <div class="my-products-panel__header">
           <div class="my-products-panel__header-left">
@@ -2174,7 +2694,12 @@ onActivated(async () => {
                 @click="handleMyProductsUploadClick"
               >
                 <span v-if="myProductsUploading" class="my-products-panel__upload-spinner"></span>
-                <img v-else :src="iconFileUpload" alt="上传" class="my-products-panel__upload-icon" />
+                <img
+                  v-else
+                  :src="iconFileUpload"
+                  alt="上传"
+                  class="my-products-panel__upload-icon"
+                />
               </button>
             </el-tooltip>
             <button
@@ -2233,8 +2758,12 @@ onActivated(async () => {
           <div v-if="myProductsLoading" class="my-products-panel__loading">
             <div v-for="i in 4" :key="i" class="my-products-panel__skeleton">
               <div class="my-products-panel__skeleton-copy">
-                <div class="my-products-panel__skeleton-line my-products-panel__skeleton-line--title"></div>
-                <div class="my-products-panel__skeleton-line my-products-panel__skeleton-line--meta"></div>
+                <div
+                  class="my-products-panel__skeleton-line my-products-panel__skeleton-line--title"
+                ></div>
+                <div
+                  class="my-products-panel__skeleton-line my-products-panel__skeleton-line--meta"
+                ></div>
               </div>
               <div class="my-products-panel__skeleton-actions">
                 <span></span>
@@ -2250,7 +2779,10 @@ onActivated(async () => {
           </div>
 
           <!-- 无搜索结果 -->
-          <div v-else-if="myProductsFiltered.length === 0 && myProductsKeyword" class="my-products-panel__empty">
+          <div
+            v-else-if="myProductsFiltered.length === 0 && myProductsKeyword"
+            class="my-products-panel__empty"
+          >
             <el-icon :size="36"><Search /></el-icon>
             <p>未找到匹配的文件</p>
           </div>
@@ -2333,6 +2865,23 @@ onActivated(async () => {
             </div>
           </div>
         </el-scrollbar>
+
+        <!-- 分页 -->
+        <div
+          v-if="!myProductsLoading && myProductsList.length > 0 && myProductsTotalPages > 1"
+          class="my-products-panel__pagination"
+        >
+          <el-pagination
+            background
+            small
+            layout="prev, pager, next"
+            v-model:current-page="myProductsPage"
+            :page-size="pageSize"
+            :total="myProductsTotal"
+            :pager-count="5"
+            @current-change="handleMyProductsPageChange"
+          />
+        </div>
       </aside>
     </Transition>
 
@@ -2349,51 +2898,76 @@ onActivated(async () => {
     >
       <div v-if="myProductsPreviewItem" class="my-products-preview-body">
         <!-- 图片 -->
-        <div v-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'image'" class="my-products-preview-image">
-          <img :src="getMyProductsFileUrl(myProductsPreviewItem)" :alt="myProductsPreviewItem.file_name" />
+        <div
+          v-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'image'"
+          class="my-products-preview-image"
+        >
+          <img
+            :src="getMyProductsFileUrl(myProductsPreviewItem)"
+            :alt="myProductsPreviewItem.file_name"
+          />
         </div>
         <!-- PDF（iframe，不受 CORS 影响） -->
-        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'pdf'" class="my-products-preview-pdf">
+        <div
+          v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'pdf'"
+          class="my-products-preview-pdf"
+        >
           <iframe :src="getMyProductsFileUrl(myProductsPreviewItem)" frameborder="0"></iframe>
         </div>
         <!-- DOCX（<object> 标签，浏览器原生处理） -->
-        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'docx'" class="my-products-preview-pdf">
+        <div
+          v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'docx'"
+          class="my-products-preview-pdf"
+        >
           <object
             :data="getMyProductsFileUrl(myProductsPreviewItem)"
             type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             width="100%"
             height="100%"
-            style="min-height:70vh"
+            style="min-height: 70vh"
           >
             <div class="my-products-preview-office-error">
               <p>浏览器不支持预览该文档</p>
-              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)">下载 / 新窗口打开</el-button>
+              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)"
+                >下载 / 新窗口打开</el-button
+              >
             </div>
           </object>
         </div>
         <!-- XLSX（<object> 标签，浏览器原生处理） -->
-        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'xlsx'" class="my-products-preview-pdf">
+        <div
+          v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'xlsx'"
+          class="my-products-preview-pdf"
+        >
           <object
             :data="getMyProductsFileUrl(myProductsPreviewItem)"
             type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             width="100%"
             height="100%"
-            style="min-height:70vh"
+            style="min-height: 70vh"
           >
             <div class="my-products-preview-office-error">
               <p>浏览器不支持预览该文档</p>
-              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)">下载 / 新窗口打开</el-button>
+              <el-button type="primary" @click="openMyProductsFile(myProductsPreviewItem!)"
+                >下载 / 新窗口打开</el-button
+              >
             </div>
           </object>
         </div>
         <!-- 视频 -->
-        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'video'" class="my-products-preview-video">
+        <div
+          v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'video'"
+          class="my-products-preview-video"
+        >
           <video :src="getMyProductsFileUrl(myProductsPreviewItem)" controls>
             您的浏览器不支持视频播放
           </video>
         </div>
         <!-- 音频 -->
-        <div v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'audio'" class="my-products-preview-audio">
+        <div
+          v-else-if="getMyProductFileType(myProductsPreviewItem.file_name) === 'audio'"
+          class="my-products-preview-audio"
+        >
           <audio :src="getMyProductsFileUrl(myProductsPreviewItem)" controls>
             您的浏览器不支持音频播放
           </audio>
@@ -2414,7 +2988,9 @@ onActivated(async () => {
         </div>
         <!-- HTML / 文本（txt, html） -->
         <div
-          v-else-if="['text', 'html'].includes(getMyProductFileType(myProductsPreviewItem.file_name))"
+          v-else-if="
+            ['text', 'html'].includes(getMyProductFileType(myProductsPreviewItem.file_name))
+          "
           class="my-products-preview-pdf"
         >
           <iframe :src="getMyProductsFileUrl(myProductsPreviewItem)" frameborder="0"></iframe>

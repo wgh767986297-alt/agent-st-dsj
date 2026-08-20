@@ -44,6 +44,25 @@ export interface MessageMcp {
   service_name: string
 }
 
+export type GroupChatRunStatus = 'running' | 'waiting_user' | 'completed' | 'failed'
+
+export interface GroupChatMember {
+  id: string
+  name: string
+  roleName?: string
+  description?: string
+  isManager?: boolean
+}
+
+export interface GroupChatContext {
+  id: string
+  name: string
+  purpose: string
+  managerEmployeeId: string
+  managerName: string
+  members: GroupChatMember[]
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -63,6 +82,14 @@ export interface Message {
   officers?: MessageOfficer[]
   /** 选中的 MCP 服务 */
   mcps?: MessageMcp[]
+  /** 多智能体群聊上下文；随消息持久化，用于历史会话恢复群聊状态 */
+  groupChat?: GroupChatContext
+  /** 群聊消息发送者 */
+  senderName?: string
+  /** 群聊消息类型 */
+  groupMessageType?: string
+  /** 当前群聊运行状态 */
+  groupRunStatus?: GroupChatRunStatus
   contentBlocks?: MessageContentBlock[]
   toolCallGroups?: ToolCallGroup[]
   thinkingBlocks?: ThinkingBlock[]

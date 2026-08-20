@@ -88,6 +88,9 @@
             <div class="ds-card-status">
               <span v-if="getStatus(skill) !== '00'" :class="AuditStatusClass[getStatus(skill)] || 'ds-tag-approved'">{{ AuditStatusLabel[getStatus(skill)] || '未上架' }}</span>
             </div>
+            <div v-if="skill.dept_name || skill.creator_name" class="ds-card-meta">
+              {{ [skill.dept_name, skill.creator_name].filter(Boolean).join(' · ') }}
+            </div>
             <div v-if="hasSkillActions(skill)" class="ds-card-actions">
               <button v-if="getButtonVisibility(skill).showPublish" class="ds-btn-mini-primary" @click="publishSkill(skill)">申请上架</button>
               <button v-if="getButtonVisibility(skill).showUnpublish" class="ds-btn-mini-primary" @click="unpublishSkill(skill)">申请下架</button>
@@ -166,6 +169,9 @@
             </div>
             <div class="ds-card-status">
               <span class="ds-tag-approved">已上架</span>
+            </div>
+            <div v-if="skill.dept_name || skill.creator_name" class="ds-card-meta">
+              {{ [skill.dept_name, skill.creator_name].filter(Boolean).join(' · ') }}
             </div>
             <div v-if="isManager" class="ds-card-actions">
               <button v-if="isManager" class="ds-btn-mini-primary" @click="openGeneralSkillAuthDialog(skill)">授权</button>
@@ -353,7 +359,7 @@ import {
 import { skillManageApi, type SkillItem as SkillManageItem } from '@/api/skillManage'
 import { getMyResources, getPublicResources, type MySkillItem, type PublicResourceItem } from '@/api/resource'
 import { authManageApi } from '@/api/authManage'
-import { userAuditApi, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import { getStoredUserProfile, getCurrentUserId, getCurrentDeptId, isAdminAccount, isDepartmentAdmin } from '@/utils/auth'
 import {
@@ -388,6 +394,10 @@ interface SkillItem {
   _source?: 'created' | 'authorized'
   /** 技能目录名，用于智能体侧删除接口 */
   skillCode?: string
+  /** 创建者姓名 */
+  creator_name?: string
+  /** 创建者所属部门（单位） */
+  dept_name?: string
 }
 
 // ============ Tab State ============
@@ -489,6 +499,8 @@ const normalizePublicSkill = (item: PublicResourceItem, index: number): SkillIte
   status: undefined,
   dept_audit_status: item.dept_audit_status || '',
   super_audit_status: item.super_audit_status || '',
+  creator_name: item.creator_name,
+  dept_name: item.dept_name,
 })
 
 const generalSkills = computed(() => {
@@ -531,6 +543,8 @@ const normalizeSkill = (skill: SkillManageItem & { _source?: string }, index: nu
   super_audit_status: skill.super_audit_status,
   _source: (skill as any)._source,
   skillCode: skill.skill_code,
+  creator_name: skill.creator_name,
+  dept_name: skill.dept_name,
 })
 
 // ============ API Logic ============
@@ -759,11 +773,11 @@ async function openGeneralSkillAuthDialog(skill: SkillItem) {
 const filteredGeneralSkillAuthUsers = computed(() => {
   if (isSuperAdmin.value) {
     if (!generalSkillAuthDeptId.value) return generalSkillAuthUsers.value
-    return generalSkillAuthUsers.value.filter(u => u.dept_id === generalSkillAuthDeptId.value)
+    return generalSkillAuthUsers.value.filter(u => userInDept(u, generalSkillAuthDeptId.value))
   }
   const profile = getStoredUserProfile()
   const myDeptId = profile?.dept_id
-  if (myDeptId) return generalSkillAuthUsers.value.filter(u => u.dept_id === myDeptId)
+  if (myDeptId) return generalSkillAuthUsers.value.filter(u => userInDept(u, myDeptId))
   const myDept = profile?.department || ''
   if (!myDept) return generalSkillAuthUsers.value
   return generalSkillAuthUsers.value.filter(u => (u.department || '') === myDept)

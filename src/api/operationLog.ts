@@ -15,7 +15,9 @@ export interface OperationLogItem {
   user_name: string
   user_role: string
   operation_type: string
+  operation_type_cn: string
   operation_module: string
+  operation_module_cn: string
   operation_content: Record<string, unknown>
   request_ip: string
   request_url: string

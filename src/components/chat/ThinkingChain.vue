@@ -16,8 +16,11 @@
         class="chain-chevron"
         :class="{ 'chain-chevron--shut': !chainExpanded }"
         viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
       >
         <polyline points="6 9 12 15 18 9" />
       </svg>
@@ -33,16 +36,24 @@
           <template v-if="techSteps.length > 0">
             <div v-for="(step, si) in techSteps" :key="'tech-' + si" class="timeline-node">
               <div class="timeline-dot timeline-dot--tech">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <polyline points="16 18 22 12 16 6" />
                   <polyline points="8 6 2 12 8 18" />
                 </svg>
               </div>
               <div class="timeline-card timeline-card--tech">
                 <div class="timeline-card-label">技术分析</div>
-                <div class="timeline-card-content markdown-body"
-                  v-html="sanitizeAndRender(step.content)"></div>
+                <div
+                  class="timeline-card-content markdown-body"
+                  v-html="sanitizeAndRender(step.content)"
+                ></div>
               </div>
             </div>
           </template>
@@ -51,9 +62,17 @@
           <template v-if="toolSteps.length > 0">
             <div v-for="(step, si) in toolSteps" :key="'tool-' + si" class="timeline-node">
               <div class="timeline-dot timeline-dot--tool">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+                  />
                 </svg>
               </div>
               <div class="timeline-card timeline-card--tool">
@@ -73,8 +92,12 @@
                   <svg
                     class="tool-call-chevron"
                     :class="{ 'tool-call-chevron--shut': isToolResultShut(si) }"
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
                   >
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
@@ -82,8 +105,10 @@
 
                 <!-- 返回结果：展开后内联显示，无折叠框 -->
                 <div v-if="step.toolResultContent && !isToolResultShut(si)" class="tool-result">
-                  <div class="tool-result-content markdown-body"
-                    v-html="sanitizeAndRender(step.toolResultContent)"></div>
+                  <div
+                    class="tool-result-content markdown-body"
+                    v-html="sanitizeAndRender(step.toolResultContent)"
+                  ></div>
                 </div>
 
                 <!-- 调用参数：次级折叠 -->
@@ -101,14 +126,20 @@
                     <svg
                       class="tool-io-chevron"
                       :class="{ 'tool-io-chevron--shut': getToolIOState(si, 'args').shut }"
-                      viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
                     >
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
                   </div>
-                  <div class="tool-io-fold"
-                    :class="{ 'tool-io-fold--shut': getToolIOState(si, 'args').shut }">
+                  <div
+                    class="tool-io-fold"
+                    :class="{ 'tool-io-fold--shut': getToolIOState(si, 'args').shut }"
+                  >
                     <div class="tool-io-fold-inner">
                       <pre class="tool-io-code">{{ formatJson(step.toolArgs) }}</pre>
                     </div>
@@ -122,16 +153,24 @@
           <template v-if="bizContent">
             <div class="timeline-node">
               <div class="timeline-dot timeline-dot--biz">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M12 20h9" />
                   <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 </svg>
               </div>
               <div class="timeline-card timeline-card--biz">
                 <div class="timeline-card-label">分析结论</div>
-                <div class="timeline-card-content markdown-body"
-                  v-html="sanitizeAndRender(bizContent)"></div>
+                <div
+                  class="timeline-card-content markdown-body"
+                  v-html="sanitizeAndRender(bizContent)"
+                ></div>
               </div>
             </div>
           </template>
@@ -214,7 +253,9 @@ watch(
 )
 
 // ==================== 衍生数据 ====================
-interface TechStep { content: string }
+interface TechStep {
+  content: string
+}
 const techSteps = computed<TechStep[]>(() =>
   props.thinkingBlocks.map((tb) => ({ content: tb.content })),
 )
@@ -232,9 +273,7 @@ const toolSteps = computed<ToolStep[]>(() =>
   })),
 )
 
-const bizContent = computed(() =>
-  props.processTextBlocks.map((b) => b.content).join(''),
-)
+const bizContent = computed(() => props.processTextBlocks.map((b) => b.content).join(''))
 
 const hasContent = computed(
   () => techSteps.value.length > 0 || toolSteps.value.length > 0 || bizContent.value.length > 0,
@@ -264,10 +303,11 @@ function formatJson(obj: any): string {
   padding: 2px 0;
   cursor: pointer;
   user-select: none;
-  min-height: 44px;
   transition: opacity 0.15s;
 }
-.chain-header:hover { opacity: 0.7; }
+.chain-header:hover {
+  opacity: 0.7;
+}
 .chain-header:focus-visible {
   outline: 2px solid var(--ds-primary-light, #2a5aa0);
   outline-offset: 2px;
@@ -285,7 +325,9 @@ function formatJson(obj: any): string {
   transition: transform 0.25s ease;
   flex-shrink: 0;
 }
-.chain-chevron--shut { transform: rotate(-90deg); }
+.chain-chevron--shut {
+  transform: rotate(-90deg);
+}
 
 /* ==================== 折叠动画 ==================== */
 .chain-fold {
@@ -293,8 +335,12 @@ function formatJson(obj: any): string {
   grid-template-rows: 1fr;
   transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.chain-fold--shut { grid-template-rows: 0fr; }
-.chain-fold-inner { overflow: hidden; }
+.chain-fold--shut {
+  grid-template-rows: 0fr;
+}
+.chain-fold-inner {
+  overflow: hidden;
+}
 
 /* ==================== 时间轴 ==================== */
 .timeline {
@@ -330,7 +376,10 @@ function formatJson(obj: any): string {
   z-index: 1;
   margin-top: 2px;
 }
-.timeline-dot svg { width: 12px; height: 12px; }
+.timeline-dot svg {
+  width: 12px;
+  height: 12px;
+}
 .timeline-dot--tech {
   color: var(--ds-primary-light, #2a5aa0);
   background: var(--ds-primary-soft, rgba(26, 58, 107, 0.08));
@@ -388,7 +437,9 @@ function formatJson(obj: any): string {
   min-height: 30px;
   transition: opacity 0.15s;
 }
-.tool-call-bar:hover { opacity: 0.7; }
+.tool-call-bar:hover {
+  opacity: 0.7;
+}
 .tool-call-bar:focus-visible {
   outline: 2px solid var(--ds-primary-light, #2a5aa0);
   outline-offset: 1px;
@@ -421,7 +472,9 @@ function formatJson(obj: any): string {
   transition: transform 0.25s ease;
   flex-shrink: 0;
 }
-.tool-call-chevron--shut { transform: rotate(-90deg); }
+.tool-call-chevron--shut {
+  transform: rotate(-90deg);
+}
 
 /* ==================== 工具返回结果（内联，无折叠框） ==================== */
 .tool-result {
@@ -455,21 +508,29 @@ function formatJson(obj: any): string {
   min-height: 30px;
   transition: color 0.15s;
 }
-.tool-io-header:hover { color: var(--ds-text-secondary, #666); }
+.tool-io-header:hover {
+  color: var(--ds-text-secondary, #666);
+}
 .tool-io-chevron {
   width: 10px;
   height: 10px;
   transition: transform 0.25s ease;
   flex-shrink: 0;
 }
-.tool-io-chevron--shut { transform: rotate(-90deg); }
+.tool-io-chevron--shut {
+  transform: rotate(-90deg);
+}
 .tool-io-fold {
   display: grid;
   grid-template-rows: 1fr;
   transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.tool-io-fold--shut { grid-template-rows: 0fr; }
-.tool-io-fold-inner { overflow: hidden; }
+.tool-io-fold--shut {
+  grid-template-rows: 0fr;
+}
+.tool-io-fold-inner {
+  overflow: hidden;
+}
 .tool-io-code {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 11px;
@@ -571,13 +632,20 @@ function formatJson(obj: any): string {
 }
 
 @media (max-width: 640px) {
-  .timeline-card { padding: 6px 8px; }
-  .timeline-line { left: 7px; }
+  .timeline-card {
+    padding: 6px 8px;
+  }
+  .timeline-line {
+    left: 7px;
+  }
   .timeline-dot {
     width: 18px;
     height: 18px;
     flex: 0 0 18px;
   }
-  .timeline-dot svg { width: 10px; height: 10px; }
+  .timeline-dot svg {
+    width: 10px;
+    height: 10px;
+  }
 }
 </style>

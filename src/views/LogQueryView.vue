@@ -119,7 +119,19 @@
         </div>
 
         <!-- 统一审计表格 -->
-        <div class="ds-table-wrap">
+        <div
+          class="ds-table-wrap"
+          :class="{ 'ds-table-wrap--refreshing': loading && pagedUnifiedRows.length > 0 }"
+        >
+          <div
+            v-if="loading && pagedUnifiedRows.length > 0"
+            class="ds-table-refreshing"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="ds-table-refreshing__spinner" aria-hidden="true"></span>
+            日志刷新中
+          </div>
           <table class="ds-table">
             <thead>
               <tr>
@@ -132,7 +144,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-if="loading" class="ds-loading-row">
+              <tr v-if="loading && pagedUnifiedRows.length === 0" class="ds-loading-row">
                 <td colspan="6" class="ds-empty-cell" style="padding: 60px 20px">
                   <span style="color: var(--ds-text-secondary)">日志查询中...</span>
                 </td>
@@ -677,26 +689,6 @@ function normalizeConversationToAudit(row: NormalizedConversationLog): AuditLogR
 }
 
 function normalizeOperationToAudit(row: OperationLogItem): AuditLogRow {
-  const typeMap: Record<string, string> = {
-    CREATE: '创建',
-    UPDATE: '更新',
-    DELETE: '删除',
-    ASSIGN: '分配',
-    AUTH: '授权',
-    AUDIT: '审核',
-    APPLY: '申请',
-  }
-  const moduleMap: Record<string, string> = {
-    DEPARTMENT: '部门管理',
-    SKILL: '技能管理',
-    OFFICER: '数字警员',
-    MCP: 'MCP服务',
-    AUTH: '授权管理',
-    USER: '用户管理',
-    ROLE: '角色管理',
-  }
-  const opType = typeMap[row.operation_type] || row.operation_type
-  const opModule = moduleMap[row.operation_module] || row.operation_module
   let content = ''
   try {
     content =
@@ -715,7 +707,7 @@ function normalizeOperationToAudit(row: OperationLogItem): AuditLogRow {
     user: row.user_name || row.user_account || '-',
     account: row.user_account || '-',
     role: row.user_role || deriveRole(row.user_account || '', 'operation', row),
-    operationType: `${opType}·${opModule}`,
+    operationType: row.operation_type_cn,
     operationContent: content,
     ip: row.request_ip || '-',
     sourceType: 'operation',
@@ -1360,6 +1352,45 @@ onMounted(() => {
 .ds-page-wrapper {
   height: 100%;
   overflow-y: auto;
+}
+
+.ds-table-wrap--refreshing {
+  position: relative;
+}
+
+.ds-table-refreshing {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  color: var(--ds-primary);
+  background: color-mix(in srgb, var(--ds-card) 92%, transparent);
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(26, 58, 107, 0.12);
+}
+
+.ds-table-refreshing__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--ds-primary) 25%, transparent);
+  border-top-color: var(--ds-primary);
+  border-radius: 50%;
+  animation: ds-table-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes ds-table-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-table-refreshing__spinner { animation: none; }
 }
 
 /* 修复 Element Plus date-picker 在 ds-filter-row 中的对齐 */

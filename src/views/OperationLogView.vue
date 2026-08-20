@@ -2,7 +2,9 @@
   <div class="oplog-page" :class="{ 'oplog-page--embedded': embedded }">
     <header class="oplog-header">
       <div class="oplog-title-row">
-        <span class="oplog-title-icon"><el-icon :size="22"><Tickets /></el-icon></span>
+        <span class="oplog-title-icon"
+          ><el-icon :size="22"><Tickets /></el-icon
+        ></span>
         <div><h1>操作日志</h1></div>
       </div>
     </header>
@@ -10,28 +12,87 @@
     <main class="oplog-panel">
       <div class="oplog-toolbar">
         <div class="oplog-toolbar__filters">
-          <el-input v-model="query.user_account" class="oplog-input oplog-input--account" placeholder="用户账号" clearable />
-          <el-select v-model="query.operation_type" class="oplog-input oplog-input--type" placeholder="操作类型" clearable>
-            <el-option v-for="opt in opTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          <el-input
+            v-model="query.user_account"
+            class="oplog-input oplog-input--account"
+            placeholder="用户账号"
+            clearable
+          />
+          <el-select
+            v-model="query.operation_type"
+            class="oplog-input oplog-input--type"
+            placeholder="操作类型"
+            clearable
+          >
+            <el-option
+              v-for="opt in opTypeOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
-          <el-select v-model="query.operation_module" class="oplog-input oplog-input--module" placeholder="操作模块" clearable>
-            <el-option v-for="opt in opModuleOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          <el-select
+            v-model="query.operation_module"
+            class="oplog-input oplog-input--module"
+            placeholder="操作模块"
+            clearable
+          >
+            <el-option
+              v-for="opt in opModuleOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
-          <el-date-picker v-model="dateRange" class="oplog-date-range" type="datetimerange" range-separator="至"
-            start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DD HH:mm:ss"
-            format="YYYY-MM-DD HH:mm" />
+          <el-date-picker
+            v-model="dateRange"
+            class="oplog-date-range"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            format="YYYY-MM-DD HH:mm"
+          />
         </div>
         <div class="oplog-toolbar__actions">
-          <el-button type="primary" class="oplog-btn oplog-btn--primary" :icon="Search" :loading="loading" @click="doQuery">查询</el-button>
-          <el-button class="oplog-btn oplog-btn--reset" :icon="Refresh" @click="handleReset">重置</el-button>
-          <el-button class="oplog-btn oplog-btn--export" :icon="Download" :loading="exporting" @click="handleExport">导出 Excel</el-button>
+          <el-button
+            type="primary"
+            class="oplog-btn oplog-btn--primary"
+            :icon="Search"
+            :loading="loading"
+            @click="doQuery"
+            >查询</el-button
+          >
+          <el-button class="oplog-btn oplog-btn--reset" :icon="Refresh" @click="handleReset"
+            >重置</el-button
+          >
+          <el-button
+            class="oplog-btn oplog-btn--export"
+            :icon="Download"
+            :loading="exporting"
+            @click="handleExport"
+            >导出 Excel</el-button
+          >
         </div>
       </div>
 
       <!-- 加载骨架 -->
-      <div v-if="loading" class="table-skeleton" aria-busy="true" aria-label="加载中">
+      <div class="oplog-table-wrap">
+        <div
+          v-if="loading && logList.length > 0"
+          class="oplog-table-refreshing"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="oplog-table-refreshing__spinner" aria-hidden="true"></span>
+          日志刷新中
+        </div>
+
+      <div v-if="loading && logList.length === 0" class="table-skeleton" aria-busy="true" aria-label="加载中">
         <div v-for="n in 8" :key="n" class="table-skeleton__row">
-          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span
+          ><span></span><span></span>
         </div>
       </div>
 
@@ -40,9 +101,11 @@
         <el-table-column prop="user_name" label="操作用户" width="120" />
         <el-table-column prop="user_account" label="账号" width="160" />
         <el-table-column prop="user_role" label="角色" width="110" />
-        <el-table-column prop="operation_type" label="操作类型" width="100">
+        <el-table-column prop="operation_type" label="操作类型" width="160">
           <template #default="{ row }">
-            <el-tag size="small" :type="opTypeColor(row.operation_type)">{{ row.operation_type }}</el-tag>
+            <el-tag size="small" :type="opTypeColor(row.operation_type)">
+              {{ row.operation_type_cn }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="operation_module" label="模块" width="120" />
@@ -54,6 +117,7 @@
         <el-table-column prop="request_ip" label="IP" width="140" />
         <el-table-column prop="create_time" label="时间" width="180" />
       </el-table>
+      </div>
     </main>
   </div>
 </template>
@@ -124,8 +188,13 @@ const query = reactive({
 
 function opTypeColor(type: string) {
   const map: Record<string, string> = {
-    CREATE: 'primary', UPDATE: 'warning', DELETE: 'danger',
-    ASSIGN: 'success', AUTH: 'primary', AUDIT: 'info', APPLY: '',
+    CREATE: 'primary',
+    UPDATE: 'warning',
+    DELETE: 'danger',
+    ASSIGN: 'success',
+    AUTH: 'primary',
+    AUDIT: 'info',
+    APPLY: '',
   }
   return map[type] || 'info'
 }
@@ -187,12 +256,31 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.oplog-page { display: flex; flex-direction: column; height: 100%; padding: 0; background: var(--app-bg); color: var(--app-text); }
-.oplog-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; flex-shrink: 0; }
-.oplog-title-row { display: flex; align-items: center; gap: 14px; }
+.oplog-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+.oplog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  flex-shrink: 0;
+}
+.oplog-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
 .oplog-title-icon {
-  width: 52px; height: 52px;
-  display: grid; place-items: center;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
   flex: 0 0 52px;
   border-radius: 16px;
   color: #fff;
@@ -200,7 +288,14 @@ onMounted(() => {
   font-size: 24px;
   box-shadow: 0 8px 24px rgba(79, 124, 255, 0.22);
 }
-.oplog-title-row h1 { margin: 0; font-size: 28px; font-weight: 780; letter-spacing: -0.02em; color: var(--app-text); line-height: 1.25; }
+.oplog-title-row h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  color: var(--app-text);
+  line-height: 1.25;
+}
 
 .oplog-panel {
   flex: 1;
@@ -216,7 +311,48 @@ onMounted(() => {
     0 8px 24px rgba(24, 39, 75, 0.06);
 }
 
-.oplog-table { width: 100%; }
+.oplog-table {
+  width: 100%;
+}
+
+.oplog-table-wrap {
+  position: relative;
+}
+
+.oplog-table-refreshing {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-panel) 92%, transparent);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(26, 58, 107, 0.12);
+}
+
+.oplog-table-refreshing__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--app-primary) 25%, transparent);
+  border-top-color: var(--app-primary);
+  border-radius: 50%;
+  animation: oplog-table-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes oplog-table-refresh-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oplog-table-refreshing__spinner { animation: none; }
+}
 
 /* ==================== 工具栏 ==================== */
 .oplog-toolbar {
@@ -242,12 +378,23 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.oplog-input { flex-shrink: 0; }
-.oplog-input--account { width: 160px; }
-.oplog-input--type { width: 130px; }
-.oplog-input--module { width: 140px; }
+.oplog-input {
+  flex-shrink: 0;
+}
+.oplog-input--account {
+  width: 160px;
+}
+.oplog-input--type {
+  width: 130px;
+}
+.oplog-input--module {
+  width: 140px;
+}
 
-.oplog-date-range { width: 300px; flex-shrink: 0; }
+.oplog-date-range {
+  width: 300px;
+  flex-shrink: 0;
+}
 
 /* 统一样式 */
 :deep(.el-input__wrapper) {
@@ -256,17 +403,32 @@ onMounted(() => {
   box-shadow: none;
   background: var(--app-panel-muted);
   border: 1.5px solid var(--app-border);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
-:deep(.el-input__wrapper:hover) { border-color: var(--app-border-hover); }
+:deep(.el-input__wrapper:hover) {
+  border-color: var(--app-border-hover);
+}
 :deep(.el-input__wrapper.is-focus) {
   border-color: var(--app-primary);
   box-shadow: 0 0 0 3px var(--app-primary-softer);
 }
-:deep(.el-input__inner) { font-size: 13px; color: var(--app-text); }
-:deep(.el-input__inner::placeholder) { color: var(--app-text-subtle); }
-:deep(.el-range-input) { font-size: 13px; color: var(--app-text); min-width: 0; }
-:deep(.el-range-input::placeholder) { color: var(--app-text-subtle); }
+:deep(.el-input__inner) {
+  font-size: 13px;
+  color: var(--app-text);
+}
+:deep(.el-input__inner::placeholder) {
+  color: var(--app-text-subtle);
+}
+:deep(.el-range-input) {
+  font-size: 13px;
+  color: var(--app-text);
+  min-width: 0;
+}
+:deep(.el-range-input::placeholder) {
+  color: var(--app-text-subtle);
+}
 :deep(.el-range-separator) {
   color: var(--app-text-muted);
   font-size: 12px;
@@ -327,7 +489,9 @@ onMounted(() => {
 }
 
 /* Skeleton */
-.table-skeleton { display: grid; }
+.table-skeleton {
+  display: grid;
+}
 .table-skeleton__row {
   height: 56px;
   display: grid;
@@ -344,17 +508,44 @@ onMounted(() => {
   animation: oplog-skeleton-pulse 1.5s ease-in-out infinite;
 }
 @keyframes oplog-skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 @media (max-width: 768px) {
-  .oplog-header { flex-direction: column; align-items: stretch; }
-  .oplog-title-row h1 { font-size: 20px; }
-  .oplog-title-icon { width: 44px; height: 44px; font-size: 20px; }
-  .oplog-toolbar { flex-direction: column; align-items: stretch; }
-  .oplog-toolbar__filters { flex-direction: column; align-items: stretch; }
-  .oplog-input--account, .oplog-input--type, .oplog-input--module, .oplog-date-range { width: 100%; }
-  .oplog-toolbar__actions { justify-content: flex-end; }
+  .oplog-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .oplog-title-row h1 {
+    font-size: 20px;
+  }
+  .oplog-title-icon {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+  .oplog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .oplog-toolbar__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .oplog-input--account,
+  .oplog-input--type,
+  .oplog-input--module,
+  .oplog-date-range {
+    width: 100%;
+  }
+  .oplog-toolbar__actions {
+    justify-content: flex-end;
+  }
 }
 </style>

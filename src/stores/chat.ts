@@ -1,7 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Message, HistoryItem, PersonProfile } from '@/types/chat'
+import type {
+  GroupChatContext,
+  GroupChatRunStatus,
+  HistoryItem,
+  Message,
+  PersonProfile,
+} from '@/types/chat'
 import { chatServices } from '@/api/chat'
+import { multiAgentApi, type GroupMessage, type RunBundle } from '@/api/multiAgent'
 import { applyStreamChunk, resetToolCallId } from '@/utils/streamChunkProcessor'
 import { getPersonProfileParser, resetPersonProfileParser } from '@/utils/personProfileParser'
 import { ElMessage } from 'element-plus'
@@ -27,7 +34,7 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref<string | null>(null)
   const abortController = ref<AbortController | null>(null)
   // ✅ 记录当前请求类型：'normal' 为普通问答，'function' 为功能 API
-  const currentRequestType = ref<'normal' | 'function'>('normal')
+  const currentRequestType = ref<'normal' | 'function' | 'group'>('normal')
 
   // 敏感词警告弹窗状态
   const sensitiveWarning = ref<{
@@ -219,10 +226,12 @@ export const useChatStore = defineStore('chat', () => {
       isStreaming: boolean
       isCompleteChat: boolean
       abortController: AbortController | null
-      currentRequestType: 'normal' | 'function'
+      currentRequestType: 'normal' | 'function' | 'group'
       inputContent?: string
     }
   >()
+  const chatStateVersion = ref(0)
+  const unreadHistoryIds = ref(new Set<string>())
 
   // ✅ 新增：临时输入内容缓存（按对话 ID）
   const tempInputs = new Map<string, string>()
@@ -244,6 +253,31 @@ export const useChatStore = defineStore('chat', () => {
 
   const isActiveHistory = (historyId: string) => currentHistoryId.value === historyId
 
+  const isHistoryUnread = (historyId: string) => unreadHistoryIds.value.has(historyId)
+
+  const markHistoryUnreadIfInactive = (historyId: string) => {
+    if (!isActiveHistory(historyId)) {
+      unreadHistoryIds.value = new Set(unreadHistoryIds.value).add(historyId)
+    }
+  }
+
+  const clearHistoryUnread = (historyId: string) => {
+    if (!unreadHistoryIds.value.has(historyId)) return
+    const nextUnreadHistoryIds = new Set(unreadHistoryIds.value)
+    nextUnreadHistoryIds.delete(historyId)
+    unreadHistoryIds.value = nextUnreadHistoryIds
+  }
+
+  const isHistoryProcessing = (historyId: string) => {
+    // 让缓存会话状态变更也能触发历史列表的提示动画更新。
+    chatStateVersion.value
+    if (isActiveHistory(historyId)) {
+      return isTyping.value || isStreaming.value
+    }
+    const cached = chatCache.get(historyId)
+    return Boolean(cached?.isTyping || cached?.isStreaming)
+  }
+
   const updateCachedChatState = (
     historyId: string,
     partial: Partial<{
@@ -253,7 +287,7 @@ export const useChatStore = defineStore('chat', () => {
       isStreaming: boolean
       isCompleteChat: boolean
       abortController: AbortController | null
-      currentRequestType: 'normal' | 'function'
+      currentRequestType: 'normal' | 'function' | 'group'
     }>,
   ) => {
     const cached = chatCache.get(historyId)
@@ -271,6 +305,7 @@ export const useChatStore = defineStore('chat', () => {
       if (partial.currentRequestType !== undefined)
         currentRequestType.value = partial.currentRequestType
     }
+    chatStateVersion.value++
   }
 
   // ✅ 保存当前对话到缓存池
@@ -326,6 +361,9 @@ export const useChatStore = defineStore('chat', () => {
   const generateTitle = () => {
     const firstUserMsg = messages.value.find((m) => m.role === 'user')
     if (firstUserMsg) {
+      if (firstUserMsg.groupChat?.name) {
+        return `群聊·${firstUserMsg.groupChat.name}`
+      }
       return firstUserMsg.content.slice(0, 20) + (firstUserMsg.content.length > 20 ? '...' : '')
     }
     return '新对话'
@@ -335,6 +373,9 @@ export const useChatStore = defineStore('chat', () => {
   const generateTitleFromMessages = (messageList: Message[]) => {
     const firstUserMsg = messageList.find((m) => m.role === 'user')
     if (firstUserMsg) {
+      if (firstUserMsg.groupChat?.name) {
+        return `群聊·${firstUserMsg.groupChat.name}`
+      }
       return firstUserMsg.content.slice(0, 20) + (firstUserMsg.content.length > 20 ? '...' : '')
     }
     return '新对话'
@@ -363,6 +404,44 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const hasMessages = computed(() => messages.value.length > 0)
+
+  const isVisibleGroupMessage = (message: GroupMessage) =>
+    message.message_type !== 'manager_plan' && message.metadata?.visible !== false
+
+  const mapGroupMessage = (
+    message: GroupMessage,
+    groupChat: GroupChatContext,
+    runStatus?: GroupChatRunStatus,
+  ): Message => ({
+    id: message.id,
+    role: message.sender_type === 'user' ? 'user' : 'assistant',
+    content: message.content,
+    timestamp: Number.isNaN(Date.parse(message.created_at))
+      ? Date.now()
+      : Date.parse(message.created_at),
+    groupChat,
+    senderName: message.sender_name || undefined,
+    groupMessageType: message.message_type,
+    groupRunStatus: runStatus,
+  })
+
+  const mergeGroupMessages = (
+    targetMessages: Message[],
+    groupMessages: GroupMessage[],
+    groupChat: GroupChatContext,
+    runStatus?: GroupChatRunStatus,
+  ) => {
+    const existingIds = new Set(targetMessages.map((message) => message.id))
+    groupMessages
+      .filter(isVisibleGroupMessage)
+      .map((message) => mapGroupMessage(message, groupChat, runStatus))
+      .forEach((message) => {
+        if (!existingIds.has(message.id)) {
+          targetMessages.push(message)
+          existingIds.add(message.id)
+        }
+      })
+  }
 
   // ✅ 停止流式传输
   const stopStreaming = () => {
@@ -567,10 +646,13 @@ export const useChatStore = defineStore('chat', () => {
         abortController: null,
         currentRequestType: 'normal',
       })
-      // ✅ 直接重置 store 的流式状态，防止用户已切换到其他对话时状态残留
-      isTyping.value = false
-      isStreaming.value = false
-      isCompleteChat.value = true
+      markHistoryUnreadIfInactive(requestHistoryId)
+      // 仅在该请求仍是当前会话时更新视图状态，避免覆盖用户切换后的会话状态。
+      if (isActiveHistory(requestHistoryId)) {
+        isTyping.value = false
+        isStreaming.value = false
+        isCompleteChat.value = true
+      }
     } catch (err) {
       // ✅ 检查是否是用户主动中止的请求
       if (err instanceof Error && err.name === 'AbortError') {
@@ -581,9 +663,12 @@ export const useChatStore = defineStore('chat', () => {
           abortController: null,
           currentRequestType: 'normal',
         })
-        isTyping.value = false
-        isStreaming.value = false
-        isCompleteChat.value = true
+        markHistoryUnreadIfInactive(requestHistoryId)
+        if (isActiveHistory(requestHistoryId)) {
+          isTyping.value = false
+          isStreaming.value = false
+          isCompleteChat.value = true
+        }
         return
       }
 
@@ -602,11 +687,187 @@ export const useChatStore = defineStore('chat', () => {
         abortController: null,
         currentRequestType: 'normal',
       })
-      isTyping.value = false
-      isStreaming.value = false
-      isCompleteChat.value = true
+      markHistoryUnreadIfInactive(requestHistoryId)
+      if (isActiveHistory(requestHistoryId)) {
+        isTyping.value = false
+        isStreaming.value = false
+        isCompleteChat.value = true
+      }
     }
   }
+
+  const sendGroupMessage = async (groupChat: GroupChatContext, content: string) => {
+    const normalizedContent = content.trim()
+    if (!normalizedContent || isTyping.value || isStreaming.value) return
+
+    isCompleteChat.value = false
+    isTyping.value = true
+    isStreaming.value = true
+    currentRequestType.value = 'group'
+    error.value = null
+    abortController.value = new AbortController()
+
+    const user = getUser()
+    if (!currentHistoryId.value) {
+      currentHistoryId.value = createHistoryId()
+    }
+
+    const requestHistoryId = currentHistoryId.value as string
+    const targetMessages = messages.value
+    const requestController = abortController.value
+    const localMessageId = `group-user-${Date.now()}`
+    const pendingMessageId = `group-pending-${Date.now()}`
+    const localInsertionIndex = targetMessages.length
+
+    if (targetMessages.length === 0) {
+      try {
+        const now = Date.now()
+        await saveConversation({
+          id: requestHistoryId,
+          user,
+          title: `群聊·${groupChat.name}`,
+          messages: [],
+          createdAt: now,
+          updatedAt: now,
+        })
+        await refreshHistoryList()
+      } catch {
+        // 历史记录保存失败不阻断群聊接口。
+      }
+    }
+
+    targetMessages.push(
+      {
+        id: localMessageId,
+        role: 'user',
+        content: normalizedContent,
+        timestamp: Date.now(),
+        groupChat,
+        groupRunStatus: 'running',
+      },
+      {
+        id: pendingMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        groupChat,
+        senderName: groupChat.managerName,
+        groupRunStatus: 'running',
+      },
+    )
+    saveCurrentChatToCache()
+
+    const removeLocalMessages = () => {
+      for (const id of [localMessageId, pendingMessageId]) {
+        const index = targetMessages.findIndex((message) => message.id === id)
+        if (index >= 0) targetMessages.splice(index, 1)
+      }
+    }
+
+    const finishGroupRequest = () => {
+      updateCachedChatState(requestHistoryId, {
+        isTyping: false,
+        isStreaming: false,
+        isCompleteChat: true,
+        abortController: null,
+        currentRequestType: 'normal',
+      })
+      markHistoryUnreadIfInactive(requestHistoryId)
+      if (isActiveHistory(requestHistoryId)) {
+        isTyping.value = false
+        isStreaming.value = false
+        isCompleteChat.value = true
+        abortController.value = null
+        currentRequestType.value = 'normal'
+      }
+    }
+
+    try {
+      const bundle: RunBundle = await multiAgentApi.sendGroupMessage(
+        groupChat.id,
+        normalizedContent,
+      )
+      if (requestController.signal.aborted) return
+
+      removeLocalMessages()
+      mergeGroupMessages(targetMessages, bundle.messages, groupChat, bundle.run.status)
+
+      const hasUserMessage = bundle.messages.some(
+        (message) => isVisibleGroupMessage(message) && message.sender_type === 'user',
+      )
+      if (!hasUserMessage) {
+        targetMessages.splice(localInsertionIndex, 0, {
+          id: localMessageId,
+          role: 'user',
+          content: normalizedContent,
+          timestamp: Date.now(),
+          groupChat,
+          groupRunStatus: bundle.run.status,
+        })
+      }
+
+      if (bundle.run.status === 'failed') {
+        const hasRunErrorMessage = bundle.messages.some(
+          (message) =>
+            isVisibleGroupMessage(message) &&
+            (message.message_type === 'task_error' || message.content === bundle.run.error),
+        )
+        if (!hasRunErrorMessage) {
+          targetMessages.push({
+            id: `group-error-${Date.now()}`,
+            role: 'assistant',
+            content: bundle.run.error || '本轮群聊执行失败',
+            timestamp: Date.now(),
+            groupChat,
+            senderName: groupChat.managerName,
+            groupMessageType: 'task_error',
+            groupRunStatus: 'failed',
+          })
+        }
+        ElMessage.error(bundle.run.error || '本轮群聊执行失败')
+      }
+
+      await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      finishGroupRequest()
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        finishGroupRequest()
+        return
+      }
+
+      removeLocalMessages()
+      try {
+        const latestMessages = await multiAgentApi.getGroupMessages(groupChat.id)
+        mergeGroupMessages(targetMessages, latestMessages, groupChat)
+      } catch {
+        targetMessages.push({
+          id: localMessageId,
+          role: 'user',
+          content: normalizedContent,
+          timestamp: Date.now(),
+          groupChat,
+          groupRunStatus: 'failed',
+        })
+      }
+
+      const errorMessage = err instanceof Error ? err.message : '群聊请求失败'
+      targetMessages.push({
+        id: `group-error-${Date.now()}`,
+        role: 'assistant',
+        content: `群聊请求失败：${errorMessage}`,
+        timestamp: Date.now(),
+        groupChat,
+        senderName: groupChat.managerName,
+        groupMessageType: 'task_error',
+        groupRunStatus: 'failed',
+      })
+      error.value = errorMessage
+      await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      finishGroupRequest()
+      ElMessage.error(errorMessage)
+    }
+  }
+
   const autoSaveConversation = async () => {
     // ✅ 修改条件：只要有消息就保存，不强制要求 currentHistoryId
     if (messages.value.length === 0) {
@@ -673,6 +934,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 清空缓存池和输入缓存
     chatCache.clear()
+    unreadHistoryIds.value = new Set()
     tempInputs.clear()
 
     // 重置所有 ref 到初始值
@@ -791,6 +1053,14 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // 收起历史记录（本地裁剪，不重新请求接口，避免刷新闪烁）
+  const collapseHistoryList = () => {
+    if (historyList.value.length <= 10) return
+    historyList.value = historyList.value.slice(0, 10)
+    historyTotalLoaded.value = 10
+    historyHasMore.value = true
+  }
+
   // ✅ 加载历史对话 - 支持随意切换
   const loadHistory = async (history: HistoryItem) => {
     if (!history?.id) {
@@ -830,6 +1100,7 @@ export const useChatStore = defineStore('chat', () => {
           })
         }
 
+        clearHistoryUnread(history.id)
         return
       }
 
@@ -852,6 +1123,7 @@ export const useChatStore = defineStore('chat', () => {
           abortController: null,
           currentRequestType: 'normal',
         })
+        clearHistoryUnread(history.id)
         return
       }
     } catch (err) {
@@ -936,6 +1208,7 @@ export const useChatStore = defineStore('chat', () => {
         clearMessages()
       }
       removeChatFromCache(historyId)
+      clearHistoryUnread(historyId)
       ElMessage.success('删除成功')
     } catch (err) {
       ElMessage.error('删除失败')
@@ -974,12 +1247,14 @@ export const useChatStore = defineStore('chat', () => {
     abortController,
     currentRequestType,
     sendMessage,
+    sendGroupMessage,
     saveAndClearMessages,
     autoSaveConversation,
     historyTotalLoaded,
     historyHasMore,
     refreshHistoryList,
     loadMoreHistory,
+    collapseHistoryList,
     loadHistory,
     createNewChat,
     resetAll,
@@ -1002,5 +1277,7 @@ export const useChatStore = defineStore('chat', () => {
     setPersonProfile,
     clearPersonProfile,
     setPersonProfileActive,
+    isHistoryProcessing,
+    isHistoryUnread,
   }
 })

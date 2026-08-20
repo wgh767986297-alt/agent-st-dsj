@@ -9,6 +9,7 @@ import {
 import { authManageApi } from '@/api/authManage'
 import type { AuthResource } from '@/api/authManage'
 import { getStatus, AuditStatusLabel } from '@/utils/auditStatus'
+import { getMyResources } from '@/api/resource'
 
 // ================================================================
 // User state
@@ -38,12 +39,7 @@ const accessiblePageCount = computed(() => {
   return 4
 })
 
-const authorizedResourceCount = computed(() => {
-  if (isAdminAccount()) return 13
-  if (isSecurityAuditor()) return 0
-  if (userRole.value === '部门管理员') return 7
-  return 3
-})
+const authorizedResourceCount = ref(0)
 
 const hasDeptMgmt = computed(() => isAdminAccount() || userRole.value === '部门管理员')
 const hasResourceApproval = computed(() => isAdminAccount() || userRole.value === '部门管理员')
@@ -55,48 +51,34 @@ interface ResourceChip {
   disabled?: boolean
 }
 
-const resourceChips = computed<ResourceChip[]>(() => {
-  if (isSecurityAuditor()) return []
+const resourceChips = ref<ResourceChip[]>([])
+const authorizedResourcesLoading = ref(false)
 
-  if (isAdminAccount()) {
-    return [
-      { label: '人员信息核查', type: 'skill' },
-      { label: '车辆轨迹追踪', type: 'skill' },
-      { label: '案件智能研判', type: 'skill' },
-      { label: '情报汇总分析', type: 'skill' },
-      { label: '关系网络分析', type: 'skill' },
-      { label: '重点区域监控', type: 'skill' },
-      { label: 'MCP·户籍查询', type: 'mcp' },
-      { label: 'MCP·卡口数据', type: 'mcp' },
-      { label: 'MCP·GIS地图', type: 'mcp' },
-      { label: 'MCP·警情数据', type: 'mcp' },
-      { label: '警员·人员核查员', type: 'officer' },
-      { label: '警员·车辆分析员', type: 'officer' },
-      { label: '警员·案件研判员', type: 'officer' },
-    ]
+async function fetchAuthorizedResources() {
+  if (isSecurityAuditor()) {
+    resourceChips.value = []
+    authorizedResourceCount.value = 0
+    return
   }
-
-  if (userRole.value === '部门管理员') {
-    return [
-      { label: '人员信息核查', type: 'skill' },
-      { label: '车辆轨迹追踪', type: 'skill' },
-      { label: '案件智能研判', type: 'skill' },
-      { label: 'MCP·户籍查询', type: 'mcp' },
-      { label: 'MCP·卡口数据', type: 'mcp' },
-      { label: '警员·人员核查员', type: 'officer' },
-      { label: '警员·车辆分析员', type: 'officer' },
-      { label: '情报汇总分析', type: 'skill', disabled: true },
+  authorizedResourcesLoading.value = true
+  try {
+    const data = await getMyResources()
+    const skills = (data.list.skills || []).filter((s) => s._source === 'authorized')
+    const mcps = (data.list.mcps || []).filter((m) => m._source === 'authorized')
+    const officers = (data.list.officers || []).filter((o) => o._source === 'authorized')
+    resourceChips.value = [
+      ...skills.map((s) => ({ label: s.skill_name, type: 'skill' as const })),
+      ...mcps.map((m) => ({ label: `MCP·${m.service_name}`, type: 'mcp' as const })),
+      ...officers.map((o) => ({ label: `警员·${o.officer_name}`, type: 'officer' as const })),
     ]
+    authorizedResourceCount.value = resourceChips.value.length
+  } catch {
+    resourceChips.value = []
+    authorizedResourceCount.value = 0
+  } finally {
+    authorizedResourcesLoading.value = false
   }
-
-  return [
-    { label: '人员信息核查', type: 'skill' },
-    { label: 'MCP·户籍查询', type: 'mcp' },
-    { label: '警员·人员核查员', type: 'officer' },
-    { label: '案件智能研判', type: 'skill', disabled: true },
-    { label: '车辆轨迹追踪', type: 'skill', disabled: true },
-  ]
-})
+}
 
 // ---- Application history table ----
 interface ApplicationRow {
@@ -245,6 +227,7 @@ watch([resourcesPage], () => {
 })
 
 onMounted(() => {
+  fetchAuthorizedResources()
   if (isAdminAccount()) fetchResources()
 })
 </script>
@@ -295,6 +278,14 @@ onMounted(() => {
 
         <div v-if="isSecurityAuditor()" class="ds-empty">
           审计员角色不持有业务资源授权，仅可只读访问审计日志。
+        </div>
+
+        <div v-else-if="authorizedResourcesLoading" class="ds-empty">
+          加载中...
+        </div>
+
+        <div v-else-if="resourceChips.length === 0" class="ds-empty">
+          暂无已授权资源
         </div>
 
         <div v-else class="ds-myperm-list">

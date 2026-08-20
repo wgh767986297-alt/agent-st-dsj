@@ -73,10 +73,12 @@ import arrowRightIcon from '@/assets/icons/chat/icon-chat-arrow-right.png'
 interface Props {
   message: Message
   isStreaming?: boolean
+  isAnswerInProgress?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isStreaming: false,
+  isAnswerInProgress: false,
 })
 
 const messageSkills = computed(() => {
@@ -208,7 +210,7 @@ const processActionTags = (content: string): string => {
     const escapedText = escapeHtml(text.trim())
     if (cmd === 'InputChat') {
       // 可点击类型：使用特殊样式 + data 属性存储文本，末尾追加右箭头
-      return `<span class="action-tag action-tag--clickable" data-action-text="${escapedText}">${escapedText}</span>`
+      return `<span class="action-tag action-tag--clickable" data-action-text="${escapedText}" aria-disabled="${props.isAnswerInProgress}">${escapedText}</span>`
     }
     // 其他 cmd 类型：仅样式区分，不可点击
     return `<span class="action-tag" data-action-cmd="${escapeHtml(cmd)}">${escapedText}</span>`
@@ -283,6 +285,7 @@ const sanitizeAndRender = (content: string) => {
       'data-action-cmd',
       'role',
       'aria-label',
+      'aria-disabled',
     ],
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
     FORBID_ATTR: ['onload', 'onclick', 'onmouseover'],
@@ -592,6 +595,11 @@ const handleActionClick = (e: MouseEvent) => {
   outline: 2px solid var(--ds-primary-light, #2a5aa0);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+:deep(.action-tag--clickable[aria-disabled='true']) {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 /* 深色模式 */

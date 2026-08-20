@@ -130,6 +130,9 @@
                 >{{ statusLabel(officer) }}</span
               >
             </div>
+            <div v-if="officer.dept_name || officer.creator_name" class="ds-card-meta">
+              {{ [officer.dept_name, officer.creator_name].filter(Boolean).join(' · ') }}
+            </div>
             <!-- Actions -->
             <div v-if="hasAnyAction(officer)" class="ds-card-actions">
               <button
@@ -216,14 +219,11 @@
             <div class="ds-card-tags">
               <span class="ds-card-tag ds-card-tag--category">数字警员</span>
             </div>
-            <div
-              v-if="item.creator_name || item.dept_name"
-              style="font-size: 11px; color: var(--ds-text-secondary); margin-top: 4px"
-            >
-              创建者：{{ item.creator_name || '—' }} | 部门：{{ item.dept_name || '—' }}
-            </div>
             <div class="ds-card-status">
               <span class="ds-tag-approved">已上架</span>
+            </div>
+            <div v-if="item.dept_name || item.creator_name" class="ds-card-meta">
+              {{ [item.dept_name, item.creator_name].filter(Boolean).join(' · ') }}
             </div>
             <div v-if="isManager" class="ds-card-actions">
               <button
@@ -496,7 +496,7 @@ import {
   type PublicResourceItem,
 } from '@/api/resource'
 import { authManageApi, type UserAuthRecord } from '@/api/authManage'
-import { userAuditApi, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import { skillManageApi, type SkillItem } from '@/api/skillManage'
 import { listAllMcpServices, type McpServiceItem } from '@/api/mcpService'
@@ -532,6 +532,7 @@ const isSuperAdmin = computed(() => isAdminAccount())
 // ==================== 标签页 ====================
 const activeTab = ref<'mine' | 'general'>('mine')
 const generalSearchQuery = ref('')
+const appliedGeneralSearchQuery = ref('')
 const generalFilter = ref('all')
 
 // ==================== 卡片颜色方案 ====================
@@ -569,6 +570,9 @@ function getOfficerDesc(officer: OfficerItem): string {
 }
 
 function getOfficerPrompt(officer: OfficerItem): string {
+  if (typeof officer.system_prompt === 'string' && officer.system_prompt) {
+    return officer.system_prompt
+  }
   if (officer.config) {
     const cfg = officer.config as Record<string, unknown>
     if (typeof cfg.systemPrompt === 'string') return cfg.systemPrompt
@@ -656,6 +660,9 @@ function getOfficerMcpsReal(officer: OfficerItem): OfficerResource[] {
 }
 
 function formatPrompt(officer: OfficerItem): string {
+  if (typeof officer.system_prompt === 'string' && officer.system_prompt) {
+    return officer.system_prompt
+  }
   if (officer.config) {
     const cfg = officer.config as Record<string, unknown>
     if (typeof cfg.prompt === 'string') return cfg.prompt
@@ -678,6 +685,7 @@ function formatPrompt(officer: OfficerItem): string {
 const loading = ref(false)
 const officerList = ref<OfficerItem[]>([])
 const searchQuery = ref('')
+const appliedSearchQuery = ref('')
 const currentFilter = ref('all')
 
 const statusFilters = [
@@ -708,14 +716,6 @@ const filteredList = computed(() => {
   } else if (currentFilter.value === 'offline') {
     list = list.filter((o) => getStatus(o) === AuditStatus.UNPUBLISHED)
   }
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
-    list = list.filter(
-      (o) =>
-        o.officer_name.toLowerCase().includes(q) ||
-        (o.description && o.description.toLowerCase().includes(q)),
-    )
-  }
   return list
 })
 
@@ -730,14 +730,6 @@ const mineFilteredList = computed(() => {
   } else if (currentFilter.value === 'public') {
     list = list.filter((o) => getStatus(o) === AuditStatus.PUBLISHED)
   }
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
-    list = list.filter(
-      (o) =>
-        o.officer_name.toLowerCase().includes(q) ||
-        (o.description && o.description.toLowerCase().includes(q)),
-    )
-  }
   return list
 })
 
@@ -749,6 +741,7 @@ const loadGeneralOfficers = async () => {
     const result = await getPublicResources({
       resource_type: 'officer',
       is_public: true,
+      keyword: appliedGeneralSearchQuery.value || undefined,
       limit: 200,
     })
     generalOfficerItems.value = result.list
@@ -758,16 +751,7 @@ const loadGeneralOfficers = async () => {
 }
 
 const generalFilteredList = computed(() => {
-  let list = generalOfficerItems.value
-  if (generalSearchQuery.value.trim()) {
-    const q = generalSearchQuery.value.trim().toLowerCase()
-    list = list.filter(
-      (o) =>
-        o.resource_name.toLowerCase().includes(q) ||
-        (o.description && o.description.toLowerCase().includes(q)),
-    )
-  }
-  return list
+  return generalOfficerItems.value
 })
 
 function statusClass(officer: OfficerItem) {
@@ -797,8 +781,15 @@ function setFilter(key: string) {
   currentFilter.value = key
 }
 
-function handleSearch() {}
-function handleGeneralSearch() {}
+async function handleSearch() {
+  appliedSearchQuery.value = searchQuery.value.trim()
+  await refreshList()
+}
+
+async function handleGeneralSearch() {
+  appliedGeneralSearchQuery.value = generalSearchQuery.value.trim()
+  await loadGeneralOfficers()
+}
 
 // ==================== 技能/MCP 选项加载 ====================
 const skillOptions = ref<(SkillItem & { icon: string })[]>([])
@@ -929,6 +920,7 @@ async function openEditDialog(officer: OfficerItem) {
     sceneDesc:
       (typeof cfg.sceneDesc === 'string' ? cfg.sceneDesc : '') || officer.description || '',
     systemPrompt:
+      (typeof officer.system_prompt === 'string' ? officer.system_prompt : '') ||
       (typeof cfg.systemPrompt === 'string' ? cfg.systemPrompt : '') ||
       (typeof cfg.prompt === 'string' ? cfg.prompt : '') ||
       '',
@@ -987,6 +979,7 @@ async function handleSubmit() {
         officer_code: form.value.officer_code.trim() || undefined,
         officer_name: form.value.officer_name.trim(),
         description: form.value.sceneDesc.trim(),
+        system_prompt: form.value.systemPrompt.trim(),
         config,
         skill_ids: form.value.selectedSkillIds.join(',') || undefined,
         mcp_ids: form.value.selectedMcpIds.join(',') || undefined,
@@ -1002,6 +995,7 @@ async function handleSubmit() {
       officer_code: form.value.officer_code.trim() || undefined,
       officer_name: form.value.officer_name.trim(),
       description: form.value.sceneDesc.trim(),
+      system_prompt: form.value.systemPrompt.trim(),
       config,
     })
     formDialogVisible.value = false
@@ -1230,13 +1224,13 @@ const filteredGeneralAuthUsers = computed(() => {
   if (isSuperAdmin.value) {
     // 超管：按选中的部门筛选，未选部门时显示全部
     if (!generalAuthDeptId.value) return generalAuthUsers.value
-    return generalAuthUsers.value.filter((u) => u.dept_id === generalAuthDeptId.value)
+    return generalAuthUsers.value.filter((u) => userInDept(u, generalAuthDeptId.value))
   }
   // 部门管理员：只显示本部门用户
   const profile = getStoredUserProfile()
   const myDeptId = profile?.dept_id
   if (myDeptId) {
-    return generalAuthUsers.value.filter((u) => u.dept_id === myDeptId)
+    return generalAuthUsers.value.filter((u) => userInDept(u, myDeptId))
   }
   const myDept = profile?.department || ''
   if (!myDept) return generalAuthUsers.value
@@ -1274,8 +1268,27 @@ async function refreshList() {
   try {
     const userId = getCurrentUserId()
     const deptId = getCurrentDeptId()
-    const data = await getMyResources('officer', userId ?? undefined, deptId ?? undefined)
-    officerList.value = data.list.officers || []
+    if (appliedSearchQuery.value) {
+      const sourceById = new Map(
+        officerList.value.map((officer) => [
+          officer.id,
+          (officer as MyOfficerItem)._source,
+        ]),
+      )
+      const result = await officerApi.list({
+        keyword: appliedSearchQuery.value,
+        limit: 200,
+      })
+      officerList.value = result.map((officer) => ({
+        ...officer,
+        _source:
+          sourceById.get(officer.id) ||
+          (officer.creator_id === userId ? 'created' : 'authorized'),
+      }))
+    } else {
+      const data = await getMyResources('officer', userId ?? undefined, deptId ?? undefined)
+      officerList.value = data.list.officers || []
+    }
     // 加载真实资源数据
     loadAllOfficerResources()
   } catch (e: any) {

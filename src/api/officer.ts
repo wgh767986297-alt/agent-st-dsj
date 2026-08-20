@@ -13,6 +13,7 @@ export interface OfficerItem {
   officer_code?: string
   officer_name: string
   description: string
+  system_prompt?: string | null
   avatar_url?: string
   config?: Record<string, unknown>
   creator_id?: number
@@ -40,6 +41,7 @@ export interface CreateOfficerPayload {
   officer_code?: string
   officer_name: string
   description?: string
+  system_prompt?: string
   avatar_url?: string
   config?: Record<string, unknown>
   is_public?: boolean
@@ -75,6 +77,7 @@ export interface UpdateOfficerPayload {
   officer_code?: string
   officer_name?: string
   description?: string
+  system_prompt?: string
   avatar_url?: string
   config?: Record<string, unknown>
   /** Skill ID 列表，逗号分隔，如 "101,102,103" */
@@ -175,6 +178,9 @@ export const officerApi = {
       dept_id?: number
       creator_id?: number
       is_public?: boolean
+      keyword?: string
+      page?: number
+      limit?: number
     } = {},
   ): Promise<OfficerItem[]> {
     const response = await postApi<BaseResponse<OfficerItem[] | { list: OfficerItem[]; total: number }>>(
