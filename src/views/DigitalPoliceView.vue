@@ -310,7 +310,20 @@
             </div>
           </div>
           <div class="form-item full">
-            <label>系统提示词（System Prompt） <span class="req">*</span></label>
+            <div class="form-label-row">
+              <label>系统提示词（System Prompt） <span class="req">*</span></label>
+              <el-button
+                v-if="!isEditing"
+                type="primary"
+                size="small"
+                :icon="MagicStick"
+                :loading="generatingSystemPrompt"
+                class="ai-generate-button"
+                @click="handleGenerateSystemPrompt"
+              >
+                AI 生成
+              </el-button>
+            </div>
             <textarea
               v-model="form.systemPrompt"
               rows="6"
@@ -487,6 +500,7 @@ import {
   Delete,
   Key,
   CircleClose,
+  MagicStick,
 } from '@element-plus/icons-vue'
 import { officerApi, type OfficerItem, type OfficerResource } from '@/api/officer'
 import {
@@ -496,7 +510,7 @@ import {
   type PublicResourceItem,
 } from '@/api/resource'
 import { authManageApi, type UserAuthRecord } from '@/api/authManage'
-import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, getUserDeptId, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import { skillManageApi, type SkillItem } from '@/api/skillManage'
 import { listAllMcpServices, type McpServiceItem } from '@/api/mcpService'
@@ -837,6 +851,7 @@ const formDialogVisible = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
 const submitting = ref(false)
+const generatingSystemPrompt = ref(false)
 
 interface OfficerForm {
   officer_name: string
@@ -876,6 +891,30 @@ function togglePickMcp(mcpId: number) {
     form.value.selectedMcpIds.splice(idx, 1)
   } else {
     form.value.selectedMcpIds.push(mcpId)
+  }
+}
+
+async function handleGenerateSystemPrompt() {
+  if (
+    form.value.selectedSkillIds.length === 0 &&
+    form.value.selectedMcpIds.length === 0
+  ) {
+    ElMessage.warning('请至少选择一个技能或 MCP 服务')
+    return
+  }
+
+  generatingSystemPrompt.value = true
+  try {
+    const result = await officerApi.generateSystemPrompt({
+      skill_key: form.value.selectedSkillIds.map(String),
+      mcp_identifiers: form.value.selectedMcpIds.map(String),
+    })
+    form.value.systemPrompt = result.system_prompt
+    ElMessage.success('系统提示词生成成功')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '生成失败，请重试')
+  } finally {
+    generatingSystemPrompt.value = false
   }
 }
 
@@ -1251,7 +1290,7 @@ async function doGeneralAuth() {
       user_id: generalAuthUserId.value,
       resource_type: 'officer',
       resource_id: generalAuthTarget.value.resource_id,
-      dept_id: selectedUser?.dept_id,
+      dept_id: getUserDeptId(selectedUser),
     })
     ElMessage.success('授权成功')
     generalAuthDialogVisible.value = false
@@ -1335,6 +1374,35 @@ onMounted(() => {
   color: var(--ds-text-secondary);
   font-weight: 500;
   margin-bottom: 5px;
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+}
+
+.form-label-row label {
+  margin-bottom: 0;
+}
+
+.ai-generate-button {
+  flex: 0 0 auto;
+  width: 88px;
+  height: 28px;
+  padding: 0;
+  background: var(--ds-primary);
+  border-color: var(--ds-primary);
+  color: #fff;
+}
+
+.ai-generate-button:hover,
+.ai-generate-button:focus-visible {
+  background: var(--ds-primary-light);
+  border-color: var(--ds-primary-light);
+  color: #fff;
 }
 
 .form-item .req {

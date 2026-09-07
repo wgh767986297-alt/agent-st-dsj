@@ -359,7 +359,7 @@ import {
 import { skillManageApi, type SkillItem as SkillManageItem } from '@/api/skillManage'
 import { getMyResources, getPublicResources, type MySkillItem, type PublicResourceItem } from '@/api/resource'
 import { authManageApi } from '@/api/authManage'
-import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, getUserDeptId, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import { getStoredUserProfile, getCurrentUserId, getCurrentDeptId, isAdminAccount, isDepartmentAdmin } from '@/utils/auth'
 import {
@@ -796,7 +796,7 @@ async function doGeneralSkillAuth() {
       user_id: generalSkillAuthUserId.value,
       resource_type: 'skill',
       resource_id: generalSkillAuthTarget.value.originalId,
-      dept_id: selectedUser?.dept_id,
+      dept_id: getUserDeptId(selectedUser),
     })
     ElMessage.success('授权成功')
     generalSkillAuthDialogVisible.value = false

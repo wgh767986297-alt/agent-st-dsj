@@ -100,10 +100,54 @@ export interface SaveResourcesPayload {
   resources: OfficerResourceItem[]
 }
 
+export interface GenerateSystemPromptPayload {
+  skill_key: string[]
+  mcp_identifiers: string[]
+  model_name?: string
+}
+
+export interface GeneratedSystemPromptData {
+  system_prompt: string
+  skills: Array<{
+    key: string
+    name: string
+    description: string
+    body_snippet: string
+  }>
+  mcp_services: Array<{
+    code: string
+    name: string
+    description: string
+    tools: string[]
+  }>
+}
+
 const BASE_URL =
   import.meta.env.VITE_PARSE_API_URL || import.meta.env.VITE_API_URL || 'http://10.32.71.224:8080'
 
 const buildUrl = (path: string) => `${BASE_URL}${path}`
+
+const buildChatUrl = (path: string) => {
+  const baseUrl = import.meta.env.VITE_CHAT_API_BASE || '/chatApi'
+  return `${baseUrl.replace(/\/$/, '')}${path}`
+}
+
+function getErrorDetail(detail: unknown): string | undefined {
+  if (typeof detail === 'string') return detail
+  if (!Array.isArray(detail)) return undefined
+
+  const messages = detail
+    .map((item) => {
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object' && 'msg' in item && typeof item.msg === 'string') {
+        return item.msg
+      }
+      return ''
+    })
+    .filter(Boolean)
+
+  return messages.length > 0 ? messages.join('；') : undefined
+}
 
 function enrichBody(body: Record<string, unknown>): Record<string, unknown> {
   const userId = getCurrentUserId()
@@ -162,6 +206,59 @@ async function postApi<T extends BaseResponse>(path: string, body: object): Prom
 
 export const officerApi = {
   // ========== 数字警员 CRUD ==========
+
+  async generateSystemPrompt(
+    payload: GenerateSystemPromptPayload,
+  ): Promise<GeneratedSystemPromptData> {
+    const token = getAuthToken()
+
+    if (!token) {
+      handleAuthExpired('登录状态已失效，请重新登录')
+      throw new Error('登录状态已失效，请重新登录')
+    }
+
+    const response = await fetch(buildChatUrl('/officer/system_prompt'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        token,
+      },
+      body: JSON.stringify(payload),
+    })
+    const responseText = await response.text()
+    let result: BaseResponse<GeneratedSystemPromptData> & { detail?: unknown }
+
+    try {
+      result = responseText ? JSON.parse(responseText) : {}
+    } catch {
+      throw new Error(responseText || '接口返回格式错误')
+    }
+
+    if (isAuthExpiredResponse(result, response.status)) {
+      handleAuthExpired()
+      throw new Error(result.message || 'token已过期')
+    }
+
+    if (!response.ok) {
+      const statusMessages: Record<number, string> = {
+        422: '请至少选择一个技能或 MCP 服务',
+        502: '生成失败，请重试',
+        503: '模型配置缺失，请联系运维',
+      }
+      throw new Error(
+        getErrorDetail(result.detail) ||
+          result.message ||
+          statusMessages[response.status] ||
+          `请求失败: ${response.status}`,
+      )
+    }
+
+    if (!result.data?.system_prompt) {
+      throw new Error(result.message || '未获取到生成的系统提示词')
+    }
+
+    return result.data
+  },
 
   async create(payload: CreateOfficerPayload): Promise<{ id: number }> {
     const response = await postApi<BaseResponse<{ id: number }>>(

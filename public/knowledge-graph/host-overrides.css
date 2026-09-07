@@ -1,0 +1,19 @@
+/* 由主应用承载时，使用主应用的顶部导航与登录用户信息。 */
+.app-header,
+.sider-account {
+  display: none !important;
+}
+
+/* 原页面为固定 Header 预留了 66px 顶部空间，随 Header 一并取消。 */
+.app-shell {
+  padding-top: 0 !important;
+}
+
+.app-sider {
+  top: 0 !important;
+  height: 100vh !important;
+}
+
+.app-content {
+  min-height: 100vh !important;
+}

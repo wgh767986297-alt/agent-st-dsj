@@ -54,6 +54,8 @@ export default defineConfig(({ mode }) => {
           target: 'http://10.32.71.223:19000',
           changeOrigin: true,
           secure: false,
+          timeout: 3600000,
+          proxyTimeout: 3600000,
           rewrite: (path) => path.replace(/^\/chatApi/, ''),
         },
         // ✅ 本地 API 代理（用于登录等接口）

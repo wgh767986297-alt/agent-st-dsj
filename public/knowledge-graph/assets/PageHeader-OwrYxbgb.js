@@ -1,0 +1,1 @@
+import{j as r,S as s}from"./index-DCzjxCeH.js";import{T as o}from"./index-CV6W4yec.js";function i({title:e,actions:a}){return r.jsxs("div",{className:`page-header ${e?"":"actions-only"}`,children:[e&&r.jsx(o.Title,{level:2,children:e}),a&&r.jsx(s,{children:a})]})}export{i as P};

@@ -41,6 +41,7 @@ import {
   Download,
   Document,
   Loading,
+  InfoFilled,
 } from '@element-plus/icons-vue'
 import type { GroupChatContext, GroupChatRunStatus, HistoryItem, Message } from '@/types/chat'
 import ActionDialog from '@/components/common/ActionDialog.vue'
@@ -54,7 +55,11 @@ import SkillsMarketView from '@/views/SkillsMarketView.vue'
 import McpManagementView from '@/views/McpManagementView.vue'
 import { type McpServiceItem } from '@/api/mcpService'
 import { officerApi, type OfficerItem } from '@/api/officer'
-import { multiAgentApi, type GroupDetail } from '@/api/multiAgent'
+import { multiAgentApi, type GroupDetail, type GroupMember } from '@/api/multiAgent'
+import {
+  groupChatHistoryApi,
+  type GroupHistoryItem,
+} from '@/api/groupChatHistory'
 import { getMyResources } from '@/api/resource'
 import { useScrollManager } from '@/composables/useScrollManager'
 import { useLongPress } from '@/composables/useLongPress'
@@ -235,7 +240,75 @@ const removeOfficer = (id: number) => {
 const groupChatDialogVisible = ref(false)
 const groupCreateSubmitting = ref(false)
 const groupTopic = ref('')
-const selectedGroupOfficerIds = ref<number[]>([])
+const groupOfficerList = ref<GroupMember[]>([])
+const groupOfficerListLoading = ref(false)
+const selectedGroupOfficerIds = ref<string[]>([])
+const selectedGroupManagerId = ref('')
+const selectedGroupMaxRounds = ref(3)
+const groupHistoryList = ref<GroupHistoryItem[]>([])
+const groupHistoryLoading = ref(false)
+
+watch(
+  () => chatStore.streamTick,
+  async () => {
+    const shouldFollowChat = !isUserScrolling.value
+    await nextTick()
+    if (shouldFollowChat) scrollToBottom(chatContainer.value?.wrapRef)
+  },
+)
+
+// 侧栏历史：在「历史对话」与「群聊历史」之间切换
+type SidebarHistoryTab = 'chat' | 'group'
+const sidebarHistoryTab = ref<SidebarHistoryTab>('chat')
+const historyTabOptions: Array<{ label: string; value: SidebarHistoryTab }> = [
+  { label: '历史对话', value: 'chat' },
+  { label: '群聊历史', value: 'group' },
+]
+
+const refreshGroupHistoryList = async () => {
+  groupHistoryLoading.value = true
+  try {
+    groupHistoryList.value = await groupChatHistoryApi.list({ limit: 20 })
+  } catch (error) {
+    groupHistoryList.value = []
+    ElMessage.error(error instanceof Error ? error.message : '群聊历史加载失败')
+  } finally {
+    groupHistoryLoading.value = false
+  }
+}
+
+const handleGroupHistoryClick = async (group: GroupHistoryItem) => {
+  sidebarHistoryPopoverVisible.value = false
+  try {
+    await chatStore.loadRecordedGroupHistory(group.id)
+    await nextTick()
+    scrollToBottom(chatContainer.value?.wrapRef)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '群聊历史加载失败')
+  }
+}
+
+const handleGroupHistoryDelete = async (group: GroupHistoryItem) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除群聊记录「${group.group_name}」吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  try {
+    await groupChatHistoryApi.delete(group.id)
+    ElMessage.success('群聊历史已删除')
+    if (chatStore.currentHistoryId === `group:${group.id}`) {
+      chatStore.clearMessages()
+    }
+    await refreshGroupHistoryList()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '群聊历史删除失败')
+  }
+}
 
 const activeGroupChat = computed<GroupChatContext | null>(() => {
   for (let index = chatStore.messages.length - 1; index >= 0; index--) {
@@ -244,6 +317,10 @@ const activeGroupChat = computed<GroupChatContext | null>(() => {
   }
   return null
 })
+
+const isGroupHistoryReadOnly = computed(
+  () => Boolean(activeGroupChat.value?.recordId) && activeGroupChat.value?.id.startsWith('record-'),
+)
 
 const activeGroupRunStatus = computed<GroupChatRunStatus | null>(() => {
   for (let index = chatStore.messages.length - 1; index >= 0; index--) {
@@ -263,10 +340,70 @@ const groupRunStatusText = computed(() => {
   return activeGroupRunStatus.value ? statusMap[activeGroupRunStatus.value] : '群聊进行中'
 })
 
+const groupTaskStatusText = (status: string) =>
+  ({ queued: '已分配', running: '执行中', completed: '已完成', failed: '失败' })[status] || status
+
+type GroupTaskView = (typeof chatStore.groupLiveTasks)[number]
+
+interface DisplayMessage extends Message {
+  groupTask?: GroupTaskView
+  taskTone?: number
+}
+
+const displayMessages = computed<DisplayMessage[]>(() => {
+  const messageList: DisplayMessage[] = chatStore.messages.map((message) => ({ ...message }))
+  if (!activeGroupChat.value || chatStore.groupLiveTasks.length === 0) return messageList
+
+  const taskMessages: DisplayMessage[] = chatStore.groupLiveTasks.map((task, index) => ({
+    id: `group-task-feed-${task.id}`,
+    role: 'assistant',
+    content: task.streamText || task.result || task.error || '',
+    timestamp: Date.parse(task.created_at) || Date.now(),
+    groupChat: activeGroupChat.value || undefined,
+    senderName: task.employee_name,
+    groupMessageType: 'task_analysis',
+    groupRunStatus: task.status === 'failed' ? 'failed' : task.status === 'completed' ? 'completed' : 'running',
+    groupRunId: task.run_id || undefined,
+    groupTask: task,
+    taskTone: index % 4,
+  }))
+
+  let lastUserIndex = -1
+  for (let index = messageList.length - 1; index >= 0; index--) {
+    if (messageList[index]?.role === 'user') {
+      lastUserIndex = index
+      break
+    }
+  }
+  const assistantOffset = messageList
+    .slice(lastUserIndex + 1)
+    .findIndex(
+      (message) =>
+        message.role === 'assistant' && message.groupMessageType !== 'task_assignment',
+    )
+  const insertAt = assistantOffset >= 0 ? lastUserIndex + 1 + assistantOffset : messageList.length
+  messageList.splice(insertAt, 0, ...taskMessages)
+  return messageList
+})
+
 const selectedGroupOfficers = computed(() => {
   const selectedIds = new Set(selectedGroupOfficerIds.value)
-  return officerList.value.filter((officer) => selectedIds.has(officer.id))
+  return groupOfficerList.value.filter((officer) => selectedIds.has(officer.id))
 })
+
+const loadGroupOfficerList = async () => {
+  if (groupOfficerListLoading.value) return
+  groupOfficerListLoading.value = true
+  groupOfficerList.value = []
+  try {
+    groupOfficerList.value = await multiAgentApi.getEmployees()
+  } catch (error) {
+    groupOfficerList.value = []
+    ElMessage.error(error instanceof Error ? error.message : '数字警员加载失败')
+  } finally {
+    groupOfficerListLoading.value = false
+  }
+}
 
 const openGroupChatDialog = () => {
   if (chatStore.isStreaming || chatStore.isTyping) {
@@ -275,14 +412,17 @@ const openGroupChatDialog = () => {
   }
   groupTopic.value = ''
   selectedGroupOfficerIds.value = []
+  selectedGroupManagerId.value = ''
+  selectedGroupMaxRounds.value = 3
   groupChatDialogVisible.value = true
-  loadOfficerList()
+  loadGroupOfficerList()
 }
 
-const toggleGroupOfficer = (officer: OfficerItem) => {
+const toggleGroupOfficer = (officer: GroupMember) => {
   if (groupCreateSubmitting.value) return
   if (selectedGroupOfficerIds.value.includes(officer.id)) {
     selectedGroupOfficerIds.value = selectedGroupOfficerIds.value.filter((id) => id !== officer.id)
+    if (selectedGroupManagerId.value === officer.id) selectedGroupManagerId.value = ''
   } else {
     selectedGroupOfficerIds.value.push(officer.id)
   }
@@ -290,7 +430,7 @@ const toggleGroupOfficer = (officer: OfficerItem) => {
 
 const buildGroupChatContext = (
   group: GroupDetail,
-  fallbackOfficers: OfficerItem[],
+  fallbackOfficers: GroupMember[],
 ): GroupChatContext => {
   const responseMembers: GroupChatContext['members'] = (group.members || []).map((member) => ({
     id: member.id,
@@ -300,10 +440,11 @@ const buildGroupChatContext = (
     isManager: member.id === group.manager_employee_id || member.is_manager,
   }))
   const fallbackMembers: GroupChatContext['members'] = fallbackOfficers.map((officer) => ({
-    id: String(officer.id),
-    name: officer.officer_name,
-    roleName: officer.officer_code,
+    id: officer.id,
+    name: officer.name,
+    roleName: officer.role_name || officer.role_code,
     description: officer.description,
+    isManager: officer.id === group.manager_employee_id,
   }))
   const members = responseMembers.length > 0 ? responseMembers : fallbackMembers
   return {
@@ -329,19 +470,33 @@ const handleCreateGroupChat = async () => {
     ElMessage.warning('请至少选择一名数字警员')
     return
   }
+  if (!selectedGroupManagerId.value) {
+    ElMessage.warning('请选择一名群管理员')
+    return
+  }
 
   groupCreateSubmitting.value = true
   try {
     const fallbackOfficers = selectedGroupOfficers.value.map((officer) => ({ ...officer }))
     const group = await multiAgentApi.createAutoGroup({
       description: topic,
+      manager_employee_id: selectedGroupManagerId.value,
       candidate_employee_ids: [...selectedGroupOfficerIds.value],
-      max_rounds: 3,
+      max_rounds: selectedGroupMaxRounds.value,
       max_tasks_per_round: 8,
     })
     const groupContext = buildGroupChatContext(group, fallbackOfficers)
 
+    const record = await groupChatHistoryApi.create({
+      group_name: group.name,
+      remark: topic,
+      announcement: `multi-agent-group-id:${group.id}`,
+      members: selectedGroupOfficerIds.value.map((id) => ({ member_uid: Number(id) })),
+    })
+    groupContext.recordId = record.id
+
     await handleNewChat()
+    chatStore.currentHistoryId = `group:${record.id}`
     currentInput.value = ''
     selectedSkills.value = []
     selectedOfficers.value = []
@@ -351,6 +506,7 @@ const handleCreateGroupChat = async () => {
 
     await nextTick()
     await chatStore.sendGroupMessage(groupContext, topic)
+    await refreshGroupHistoryList()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '群聊创建失败')
   } finally {
@@ -1148,6 +1304,17 @@ const sendCurrentMessage = async () => {
 
   const message = currentInput.value.trim()
   if (activeGroupChat.value && message) {
+    if (isGroupHistoryReadOnly.value) {
+      ElMessage.warning('该群聊历史缺少原始房间号，无法继续问答，请重新发起群聊')
+      return
+    }
+    const mentionedMember = activeGroupChat.value.members.find((member) =>
+      message.includes(`@${member.name}`),
+    )
+    if (mentionedMember) {
+      ElMessage.warning(`当前页面使用管理员编排模式，请删除“@${mentionedMember.name}”后发送`)
+      return
+    }
     currentInput.value = ''
     isUserScrolling.value = false
     isAtBottom.value = true
@@ -1555,6 +1722,7 @@ onMounted(async () => {
   }
 
   await chatStore.refreshHistoryList()
+  await refreshGroupHistoryList()
   chatStore.generateUser()
 
   isUserScrolling.value = false
@@ -1777,9 +1945,8 @@ onActivated(async () => {
           </button>
         </el-tooltip>
 
-        <!-- 发起群聊（已隐藏入口） -->
+        <!-- 发起群聊 -->
         <el-tooltip
-          v-if="false"
           content="发起群聊"
           v-bind="sidebarTooltipProps"
           :disabled="!sidebarStore.collapsed"
@@ -1813,11 +1980,31 @@ onActivated(async () => {
           </button>
         </el-tooltip>
 
-        <!-- 历史对话 -->
-        <div v-if="!sidebarStore.collapsed" class="grouped-sidebar__section-title">
-          <span>历史对话</span>
+        <!-- 历史对话 / 群聊历史 切换 -->
+        <div
+          v-if="!sidebarStore.collapsed"
+          class="grouped-sidebar__history-toggle"
+          role="tablist"
+          aria-label="历史记录类型"
+        >
           <button
-            v-if="chatStore.historyList.length > 10"
+            v-for="tab in historyTabOptions"
+            :key="tab.value"
+            class="grouped-sidebar__history-toggle-btn"
+            :class="{ 'grouped-sidebar__history-toggle-btn--active': sidebarHistoryTab === tab.value }"
+            type="button"
+            role="tab"
+            :aria-selected="sidebarHistoryTab === tab.value"
+            @click="sidebarHistoryTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+        <div
+          v-if="sidebarHistoryTab === 'chat' && chatStore.historyList.length > 10"
+          class="grouped-sidebar__history-collapse-row"
+        >
+          <button
             class="grouped-sidebar__section-title-collapse"
             type="button"
             @click="chatStore.collapseHistoryList()"
@@ -1929,7 +2116,7 @@ onActivated(async () => {
 
         <!-- 展开时的历史记录列表 -->
         <div
-          v-if="!sidebarStore.collapsed && chatStore.isHistoryRefreshing"
+          v-if="sidebarHistoryTab === 'chat' && !sidebarStore.collapsed && chatStore.isHistoryRefreshing"
           class="grouped-sidebar__history-loading"
           aria-busy="true"
         >
@@ -1945,7 +2132,7 @@ onActivated(async () => {
           </div>
         </div>
         <el-scrollbar
-          v-if="!sidebarStore.collapsed && !chatStore.isHistoryRefreshing"
+          v-if="sidebarHistoryTab === 'chat' && !sidebarStore.collapsed && !chatStore.isHistoryRefreshing"
           class="grouped-sidebar__history"
         >
           <div
@@ -2011,6 +2198,73 @@ onActivated(async () => {
             查看更多
           </button>
         </el-scrollbar>
+
+        <!-- 群聊历史 -->
+        <template v-if="sidebarHistoryTab === 'group' && !sidebarStore.collapsed">
+          <div v-if="groupHistoryLoading" class="grouped-sidebar__history-loading" aria-busy="true">
+            <div class="grouped-sidebar__history-loading-skeleton">
+              <div v-for="index in 4" :key="index" class="grouped-sidebar__history-loading-card">
+                <div
+                  class="grouped-sidebar__history-loading-line grouped-sidebar__history-loading-line--title"
+                ></div>
+                <div
+                  class="grouped-sidebar__history-loading-line grouped-sidebar__history-loading-line--meta"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <el-scrollbar
+            v-else-if="groupHistoryList.length > 0"
+            class="grouped-sidebar__history"
+          >
+            <div
+              v-for="group in groupHistoryList"
+              :key="group.id"
+              class="grouped-sidebar__history-item"
+              :class="{
+                'grouped-sidebar__history-item--active':
+                  chatStore.currentHistoryId === `group:${group.id}`,
+              }"
+              @click="handleGroupHistoryClick(group)"
+            >
+              <span class="grouped-sidebar__history-icon-circle">
+                <el-icon :size="14"><Connection /></el-icon>
+              </span>
+              <div class="grouped-sidebar__history-copy">
+                <div class="grouped-sidebar__history-name">{{ group.group_name }}</div>
+              </div>
+              <el-popover
+                placement="bottom-end"
+                trigger="click"
+                :width="140"
+                :show-arrow="false"
+                popper-class="grouped-sidebar-history-action-popover"
+              >
+                <div class="grouped-sidebar__history-action-menu">
+                  <button
+                    class="grouped-sidebar__history-action-item grouped-sidebar__history-action-item--danger"
+                    type="button"
+                    @click.stop="handleGroupHistoryDelete(group)"
+                  >
+                    <el-icon><Delete /></el-icon>
+                    <span>删除</span>
+                  </button>
+                </div>
+                <template #reference>
+                  <button
+                    class="grouped-sidebar__history-more"
+                    type="button"
+                    aria-label="更多操作"
+                    @click.stop
+                  >
+                    <el-icon><MoreFilled /></el-icon>
+                  </button>
+                </template>
+              </el-popover>
+            </div>
+          </el-scrollbar>
+          <div v-else class="grouped-sidebar__history-empty">暂无群聊历史</div>
+        </template>
       </div>
     </aside>
 
@@ -2075,16 +2329,16 @@ onActivated(async () => {
             </span>
           </div>
 
-          <div v-if="officerListLoading" class="group-employee-state">
+          <div v-if="groupOfficerListLoading" class="group-employee-state">
             <el-icon class="is-loading"><Loading /></el-icon>
             <span>正在加载数字警员...</span>
           </div>
-          <div v-else-if="officerList.length === 0" class="group-employee-state">
+          <div v-else-if="groupOfficerList.length === 0" class="group-employee-state">
             暂无可加入群聊的数字警员
           </div>
           <div v-else class="group-employee-list" role="group" aria-label="可选数字警员">
             <button
-              v-for="officer in officerList"
+              v-for="officer in groupOfficerList"
               :key="officer.id"
               type="button"
               class="group-employee-card"
@@ -2096,14 +2350,17 @@ onActivated(async () => {
               @click="toggleGroupOfficer(officer)"
             >
               <span class="group-employee-card__avatar" aria-hidden="true">
-                {{ officer.officer_name.slice(0, 1) }}
+                {{ officer.name.slice(0, 1) }}
               </span>
               <span class="group-employee-card__body">
                 <span class="group-employee-card__title-row">
-                  <strong>{{ officer.officer_name }}</strong>
+                  <strong>{{ officer.name }}</strong>
                 </span>
-                <span v-if="officer.officer_code" class="group-employee-card__role">
-                  {{ officer.officer_code }}
+                <span
+                  v-if="officer.role_name || officer.role_code"
+                  class="group-employee-card__role"
+                >
+                  {{ officer.role_name || officer.role_code }}
                 </span>
                 <span v-if="officer.description" class="group-employee-card__description">
                   {{ officer.description }}
@@ -2123,6 +2380,48 @@ onActivated(async () => {
             </button>
           </div>
         </div>
+
+        <div class="group-chat-form__field">
+          <div class="group-chat-form__label">
+            <span>群管理员</span>
+            <span class="group-chat-form__required">必选</span>
+          </div>
+          <el-select
+            v-model="selectedGroupManagerId"
+            class="group-manager-select"
+            placeholder="请从已选数字警员中指定管理员"
+            :disabled="groupCreateSubmitting || selectedGroupOfficers.length === 0"
+          >
+            <el-option
+              v-for="officer in selectedGroupOfficers"
+              :key="officer.id"
+              :label="officer.name"
+              :value="officer.id"
+            />
+          </el-select>
+          <p class="group-manager-hint">管理员负责理解任务、组织成员协作并汇总结果。</p>
+        </div>
+
+        <div class="group-chat-form__field">
+          <label for="group-chat-max-rounds" class="group-chat-form__label">
+            <span>最大协作轮次</span>
+          </label>
+          <el-select
+            id="group-chat-max-rounds"
+            v-model="selectedGroupMaxRounds"
+            class="group-manager-select"
+            :disabled="groupCreateSubmitting"
+            aria-label="最大协作轮次"
+          >
+            <el-option
+              v-for="round in 10"
+              :key="round"
+              :label="`${round} 轮`"
+              :value="round"
+            />
+          </el-select>
+          <p class="group-manager-hint">达到所选轮次后，管理员将结束协作并汇总结果。</p>
+        </div>
       </div>
 
       <template #footer>
@@ -2133,7 +2432,9 @@ onActivated(async () => {
           <el-button
             type="primary"
             :loading="groupCreateSubmitting"
-            :disabled="officerListLoading || officerList.length === 0"
+            :disabled="
+              groupOfficerListLoading || groupOfficerList.length === 0 || !selectedGroupManagerId
+            "
             @click="handleCreateGroupChat"
           >
             {{ groupCreateSubmitting ? '正在组建团队' : '创建群聊' }}
@@ -2200,6 +2501,14 @@ onActivated(async () => {
               <span v-if="member.isManager" class="group-chat-member__manager">管理员</span>
             </span>
           </div>
+          <div
+            v-if="activeGroupRunStatus === 'waiting_user'"
+            class="group-chat-clarification-notice"
+            role="status"
+          >
+            <el-icon><InfoFilled /></el-icon>
+            <span>请补充管理员需要的信息；下一条回复将继续当前协作，不会创建新任务。</span>
+          </div>
         </section>
 
         <!-- 聊天区域 -->
@@ -2223,11 +2532,15 @@ onActivated(async () => {
 
             <div class="messages-area" ref="messagesAreaRef">
               <div
-                v-for="msg in chatStore.messages"
+                v-for="msg in displayMessages"
                 :key="msg.id"
                 class="message-wrapper"
                 :id="`msg-${msg.id}`"
-                :class="{ 'user-message': msg.role === 'user' }"
+                :class="{
+                  'user-message': msg.role === 'user',
+                  'group-task-message': Boolean(msg.groupTask),
+                  [`group-task-message--tone-${msg.taskTone}`]: msg.groupTask,
+                }"
               >
                 <!-- 数字警员 & MCP 标签（消息框外上方） -->
                 <div
@@ -2256,17 +2569,32 @@ onActivated(async () => {
                 </div>
 
                 <div class="message" :class="msg.role">
-                  <div class="message-avatar">
+                  <div
+                    class="message-avatar"
+                    :class="{
+                      'message-avatar--assistant':
+                        msg.role === 'assistant' &&
+                        (!msg.groupTask ||
+                          msg.groupTask.employee_id === msg.groupChat?.managerEmployeeId),
+                    }"
+                  >
                     <img
-                      v-if="msg.role === 'assistant'"
-                      src="@/assets/icons/chat/icon-chat-assistant.png"
-                      alt="用户"
-                      class="avatar-img"
+                      v-if="
+                        msg.role === 'assistant' &&
+                        (!msg.groupTask ||
+                          msg.groupTask.employee_id === msg.groupChat?.managerEmployeeId)
+                      "
+                      src="@/assets/icons/chat/icon-sxz.png"
+                      alt="AI 助手"
+                      class="avatar-img avatar-img--assistant"
                     />
+                    <span v-else-if="msg.groupTask" class="group-task-message__avatar-text">
+                      {{ msg.groupTask.employee_name.slice(0, 1) }}
+                    </span>
                     <img
                       v-else
                       src="@/assets/icons/chat/icon-chat-assistant7.png"
-                      alt="AI助手"
+                      alt="用户"
                       class="avatar-img"
                     />
                   </div>
@@ -2275,7 +2603,24 @@ onActivated(async () => {
                       v-if="msg.role === 'assistant' && msg.groupChat && msg.senderName"
                       class="group-message-sender"
                     >
-                      {{ msg.senderName }}
+                      <span>{{ msg.senderName }}</span>
+                      <template v-if="msg.groupTask">
+                        <span class="group-task-message__round">
+                          第 {{ msg.groupTask.round_no || 1 }} 轮
+                        </span>
+                        <span
+                          class="group-task-message__status"
+                          :class="`group-task-message__status--${msg.groupTask.status}`"
+                        >
+                          {{ groupTaskStatusText(msg.groupTask.status) }}
+                        </span>
+                      </template>
+                    </div>
+                    <div v-if="msg.groupTask" class="group-task-message__brief">
+                      <span>{{ msg.groupTask.instruction }}</span>
+                      <span v-if="msg.groupTask.depends_on.length">
+                        依赖：{{ msg.groupTask.depends_on.join('、') }}
+                      </span>
                     </div>
                     <div v-if="msg.role === 'user'" class="message-text user-text">
                       <SmartMessageRenderer
@@ -2290,15 +2635,26 @@ onActivated(async () => {
                     <div v-else class="message-text">
                       <SmartMessageRenderer
                         :message="msg"
-                        :is-streaming="chatStore.isStreaming && isLastAssistantMessage(msg)"
-                        :is-answer-in-progress="chatStore.isStreaming || chatStore.isTyping"
+                        :is-streaming="
+                          msg.groupTask
+                            ? msg.groupTask.status === 'running'
+                            : chatStore.isStreaming && isLastAssistantMessage(msg)
+                        "
+                        :is-answer-in-progress="
+                          msg.groupTask
+                            ? msg.groupTask.status === 'queued' || msg.groupTask.status === 'running'
+                            : chatStore.isStreaming || chatStore.isTyping
+                        "
                         @expand-change="handleExpandChange"
                         @send-message="handleQuickStart"
                       />
                       <div
                         v-if="
-                          (chatStore.isStreaming || chatStore.isTyping) &&
-                          isLastAssistantMessage(msg)
+                          msg.groupTask
+                            ? !msg.content &&
+                              (msg.groupTask.status === 'queued' || msg.groupTask.status === 'running')
+                            : (chatStore.isStreaming || chatStore.isTyping) &&
+                              isLastAssistantMessage(msg)
                         "
                         class="thinking-container"
                       >
@@ -2331,7 +2687,7 @@ onActivated(async () => {
                     <el-tooltip
                       content="重新生成回答"
                       placement="top"
-                      v-if="msg.role === 'assistant'"
+                      v-if="msg.role === 'assistant' && !msg.groupTask"
                     >
                       <el-button
                         size="small"
@@ -2352,6 +2708,9 @@ onActivated(async () => {
 
         <!-- 欢迎语（在聊天区域居中） -->
         <div v-if="!chatStore.hasMessages" class="welcome-screen">
+          <div class="welcome-avatar" aria-hidden="true">
+            <img src="@/assets/icons/chat/icon-sxz.png" alt="" />
+          </div>
           <h1>
             <span class="typewriter-text">{{ welcomeDisplayedText }}</span>
           </h1>
@@ -2526,11 +2885,16 @@ onActivated(async () => {
                     :autosize="{ minRows: 1, maxRows: 4 }"
                     :placeholder="
                       activeGroupChat
-                        ? '向群聊继续提问，Enter 发送'
+                        ? isGroupHistoryReadOnly
+                          ? '该历史记录缺少房间号，仅支持查看'
+                          : activeGroupRunStatus === 'waiting_user'
+                            ? '补充信息并继续当前协作，Enter 发送'
+                            : '向群聊继续提问，Enter 发送'
                         : 'Enter 发送，Shift+Enter 换行'
                     "
                     :disabled="
-                      Boolean(activeGroupChat) && (chatStore.isStreaming || chatStore.isTyping)
+                      Boolean(activeGroupChat) &&
+                      (isGroupHistoryReadOnly || chatStore.isStreaming || chatStore.isTyping)
                     "
                     @keydown.enter.exact.prevent="sendCurrentMessage"
                     @paste="handleInputPaste"
@@ -2616,7 +2980,8 @@ onActivated(async () => {
                       :class="{ 'send-btn--active': hasInput || chatStore.isStreaming }"
                       type="primary"
                       :disabled="
-                        Boolean(activeGroupChat) && (chatStore.isStreaming || chatStore.isTyping)
+                        Boolean(activeGroupChat) &&
+                        (isGroupHistoryReadOnly || chatStore.isStreaming || chatStore.isTyping)
                       "
                       @click="
                         chatStore.isStreaming && !activeGroupChat

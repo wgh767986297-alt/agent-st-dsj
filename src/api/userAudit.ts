@@ -38,6 +38,18 @@ export function userInDept(user: AuditUser, deptId: number | string | null | und
   return uid != null && String(uid) === String(deptId)
 }
 
+/**
+ * 取用户的部门 ID（dept_id 优先，缺失时用 department 字符串解析为数字）。
+ * getAllUserXx 返回的 department 是字符串形式的部门 ID，授权给用户时需转成数字 dept_id。
+ */
+export function getUserDeptId(user: AuditUser | null | undefined): number | undefined {
+  if (!user) return undefined
+  const raw = user.dept_id ?? user.department
+  if (raw == null || raw === '') return undefined
+  const num = Number(raw)
+  return Number.isFinite(num) ? num : undefined
+}
+
 const AUDIT_BASE_URL =
   import.meta.env.VITE_PARSE_API_URL || import.meta.env.VITE_API_URL || 'http://10.32.71.224:8080'
 

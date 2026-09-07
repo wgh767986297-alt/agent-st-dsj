@@ -67,6 +67,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '数字警员库', requiresAuth: true },
   },
   {
+    path: '/knowledge-graph',
+    name: 'KnowledgeGraph',
+    component: () => import('@/views/KnowledgeGraphView.vue'),
+    meta: { title: '知识图谱', requiresAuth: true },
+  },
+  {
     path: '/my-permissions',
     name: 'MyPermissions',
     component: () => import('@/views/MyPermissionsView.vue'),

@@ -253,6 +253,25 @@
   object-fit: contain;
 }
 
+.welcome-avatar {
+  width: 128px;
+  height: 128px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+}
+
+.welcome-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .welcome-screen h1 {
   font-size: 2.2rem;
   background: var(--app-text);
@@ -400,6 +419,11 @@
   height: 74%;
   object-fit: cover;
   display: block;
+}
+
+.avatar-img--assistant {
+  width: 100%;
+  height: 100%;
 }
 
 .message-content {
@@ -1005,6 +1029,17 @@
   font-size: 13px;
 }
 
+.group-manager-select {
+  width: 100%;
+}
+
+.group-manager-hint {
+  margin: -3px 0 0;
+  color: var(--ds-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .group-chat-dialog__footer {
   width: 100%;
   display: flex;
@@ -1017,6 +1052,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20px;
   margin: 14px clamp(20px, 4vw, 56px) 0;
   padding: 12px 16px;
@@ -1024,6 +1060,100 @@
   border-radius: 14px;
   color: var(--app-text, #1f2937);
   background: color-mix(in srgb, var(--app-primary, #1a3a6b) 5%, var(--app-panel, #ffffff));
+}
+
+.group-task-message .message-content {
+  width: 100%;
+  max-width: calc(100% - 56px);
+}
+
+.group-task-message .group-message-sender {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-task-message__avatar-text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.group-task-message__round,
+.group-task-message__status {
+  color: var(--app-text-muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.group-task-message__status {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--app-accent-soft);
+}
+
+.group-task-message__status--running {
+  color: var(--el-color-primary);
+}
+.group-task-message__status--completed {
+  color: var(--el-color-success);
+}
+.group-task-message__status--failed {
+  color: var(--el-color-danger);
+}
+
+.group-task-message__brief {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--app-text-muted);
+  background: color-mix(in srgb, #3b82f6 7%, var(--app-panel));
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.group-task-message--tone-0 .message-avatar {
+  background: #3b82f6;
+}
+.group-task-message--tone-1 .message-avatar {
+  background: #16a34a;
+}
+.group-task-message--tone-2 .message-avatar {
+  background: #d97706;
+}
+.group-task-message--tone-3 .message-avatar {
+  background: #9333ea;
+}
+.message-avatar--assistant {
+  background: transparent;
+}
+.group-task-message--tone-1 .group-task-message__brief {
+  background: color-mix(in srgb, #22c55e 7%, var(--app-panel));
+}
+.group-task-message--tone-2 .group-task-message__brief {
+  background: color-mix(in srgb, #f59e0b 8%, var(--app-panel));
+}
+.group-task-message--tone-3 .group-task-message__brief {
+  background: color-mix(in srgb, #a855f7 7%, var(--app-panel));
+}
+
+.group-chat-clarification-notice {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, #f59e0b 26%, transparent);
+  color: #9a6700;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:root[data-theme='dark'] .group-chat-clarification-notice {
+  color: #fcd34d;
 }
 
 .group-chat-context__main {
@@ -1135,7 +1265,7 @@
 .group-message-sender {
   margin: 0 0 6px 2px;
   color: var(--app-primary, #1a3a6b);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -1799,6 +1929,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  margin-left: auto;
 }
 
 /* ==================== 文件展示卡片 ==================== */

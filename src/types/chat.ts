@@ -56,6 +56,7 @@ export interface GroupChatMember {
 
 export interface GroupChatContext {
   id: string
+  recordId?: number
   name: string
   purpose: string
   managerEmployeeId: string
@@ -90,6 +91,8 @@ export interface Message {
   groupMessageType?: string
   /** 当前群聊运行状态 */
   groupRunStatus?: GroupChatRunStatus
+  /** 群聊运行 ID；仅用于刷新后恢复 waiting_user，不保存恢复令牌 */
+  groupRunId?: string
   contentBlocks?: MessageContentBlock[]
   toolCallGroups?: ToolCallGroup[]
   thinkingBlocks?: ThinkingBlock[]

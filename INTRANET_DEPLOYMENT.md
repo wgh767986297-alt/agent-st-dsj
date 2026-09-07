@@ -48,16 +48,19 @@ server {
 
         # WebSocket 支持（流式响应需要）
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection "";
 
         # 超时设置
         proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
 
         # 关闭缓冲（流式响应必需）
         proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_cache off;
+        gzip off;
+        add_header X-Accel-Buffering no always;
     }
 
     # ⚠️ 注意：功能接口（VITE_FUNCTION_API_BASE）直接调用后端服务，不经过 Nginx 代理
@@ -68,6 +71,11 @@ server {
     #     proxy_set_header X-Real-IP $remote_addr;
     #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     # }
+
+    # 知识图谱静态应用（缺失时不要回退到主应用 index.html）
+    location ^~ /knowledge-graph/ {
+        try_files $uri =404;
+    }
 
     # ✅ 前端路由 fallback
     location / {
@@ -187,6 +195,11 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_buffering off;  # 流式响应必需
+    }
+
+    # 知识图谱静态应用（缺失时不要回退到主应用 index.html）
+    location ^~ /knowledge-graph/ {
+        try_files $uri =404;
     }
 
     # 前端路由 fallback

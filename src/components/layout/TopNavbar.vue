@@ -43,10 +43,12 @@ async function refreshApprovalCount() {
 
 onMounted(() => {
   refreshApprovalCount()
+  document.addEventListener('approval-pending-count-changed', refreshApprovalCount)
   approvalPollTimer = setInterval(refreshApprovalCount, 10 * 60_000)
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('approval-pending-count-changed', refreshApprovalCount)
   if (approvalPollTimer) {
     clearInterval(approvalPollTimer)
     approvalPollTimer = null
@@ -77,6 +79,7 @@ const navMenuItems: NavMenuItem[] = [
     route: '/digital-police',
     matchPaths: ['/digital-police'],
   },
+  { id: 'knowledge-graph', label: '知识图谱', route: '/knowledge-graph', matchPaths: ['/knowledge-graph'] },
   { id: 'admin', label: '系统管理', route: '/admin-management', matchPaths: ['/admin-management'] },
   { id: 'log-query', label: '安全审计', route: '/log-query', matchPaths: ['/log-query'] },
   {

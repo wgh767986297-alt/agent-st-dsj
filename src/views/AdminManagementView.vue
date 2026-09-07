@@ -18,6 +18,7 @@ import OfficerAuditView from '@/views/OfficerAuditView.vue'
 import McpAuditView from '@/views/McpAuditView.vue'
 import OperationLogView from '@/views/OperationLogView.vue'
 import AuthManageView from '@/views/AuthManageView.vue'
+import UsageStatisticsView from '@/views/UsageStatisticsView.vue'
 import { departmentApi, type Department } from '@/api/department'
 import { authManageApi } from '@/api/authManage'
 import { authApi } from '@/api/auth'
@@ -181,7 +182,7 @@ const handleSectionClick = async (id: AdminSectionId) => {
 }
 
 // ==================== New mgmt-tab state ====================
-type MgmtTab = 'roles' | 'dept' | 'approval' | 'models'
+type MgmtTab = 'roles' | 'dept' | 'approval' | 'models' | 'usage'
 const activeMgmtTab = ref<MgmtTab>('roles')
 const agentPanelVisible = ref(false)
 const agentInput = ref('')
@@ -904,6 +905,7 @@ async function handleAuditAction(item: PendingItem, status: string, remark?: str
     }
     ElMessage.success(AUDIT_RESULT_LABEL[status] || '操作成功')
     await loadApprovalItems()
+    document.dispatchEvent(new Event('approval-pending-count-changed'))
   } catch (e: any) {
     ElMessage.error(e.message || '操作失败')
   } finally {
@@ -968,7 +970,7 @@ watch(activeMgmtTab, (tab) => {
 onMounted(() => {
   loadDepartments()
   loadModels()
-  if (activeMgmtTab.value === 'approval') loadApprovalItems()
+  loadApprovalItems()
 })
 </script>
 
@@ -1020,6 +1022,13 @@ onMounted(() => {
             @click="activeMgmtTab = 'models'"
           >
             模型管理
+          </button>
+          <button
+            class="ds-mgmt-tab"
+            :class="{ active: activeMgmtTab === 'usage' }"
+            @click="activeMgmtTab = 'usage'"
+          >
+            用量统计
           </button>
         </nav>
         <!-- ===== Panel: 角色权限 ===== -->
@@ -1351,6 +1360,9 @@ onMounted(() => {
             </table>
           </div>
         </div>
+
+        <!-- ===== Panel: 用量统计 ===== -->
+        <UsageStatisticsView v-if="activeMgmtTab === 'usage'" embedded />
 
         </div><!-- .ds-page-container -->
       </div>

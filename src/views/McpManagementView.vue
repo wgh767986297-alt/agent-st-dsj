@@ -617,7 +617,7 @@ import {
   type PublicResourceItem,
 } from '@/api/resource'
 import { authManageApi } from '@/api/authManage'
-import { userAuditApi, userInDept, type AuditUser } from '@/api/userAudit'
+import { userAuditApi, userInDept, getUserDeptId, type AuditUser } from '@/api/userAudit'
 import { departmentApi, type Department } from '@/api/department'
 import {
   getStoredUserProfile,
@@ -1036,7 +1036,7 @@ async function doGeneralMcpAuth() {
       user_id: generalMcpAuthUserId.value,
       resource_type: 'mcp',
       resource_id: generalMcpAuthTarget.value.resource_id,
-      dept_id: selectedUser?.dept_id,
+      dept_id: getUserDeptId(selectedUser),
     })
     ElMessage.success('授权成功')
     generalMcpAuthDialogVisible.value = false

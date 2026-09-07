@@ -20,18 +20,21 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         
-        # WebSocket 支持（流式响应需要）
+        # SSE 使用长连接，但不是 WebSocket，不应发送 Upgrade 头
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection "";
         
         # 超时设置（根据实际需求调整）
         proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
         
-        # 缓冲设置（流式响应建议关闭缓冲）
+        # SSE 必须关闭代理、请求、缓存和压缩缓冲
         proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_cache off;
+        gzip off;
+        add_header X-Accel-Buffering no always;
     }
     
     # ✅ 历史记录 API 代理 - 解决跨域问题
@@ -78,6 +81,11 @@ server {
     #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     # }
     
+    # 知识图谱是独立静态应用，资源缺失时禁止回退到主应用，避免 iframe 递归嵌套。
+    location ^~ /knowledge-graph/ {
+        try_files $uri =404;
+    }
+
     # ✅ 前端路由 fallback（Vue Router history 模式必需）
     location / {
         try_files $uri $uri/ /index.html;

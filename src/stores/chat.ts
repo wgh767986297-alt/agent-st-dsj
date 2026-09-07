@@ -8,7 +8,14 @@ import type {
   PersonProfile,
 } from '@/types/chat'
 import { chatServices } from '@/api/chat'
-import { multiAgentApi, type GroupMessage, type RunBundle } from '@/api/multiAgent'
+import {
+  MultiAgentApiError,
+  multiAgentApi,
+  type GroupMessage,
+  type GroupSseEvent,
+  type GroupTask,
+  type RunBundle,
+} from '@/api/multiAgent'
 import { applyStreamChunk, resetToolCallId } from '@/utils/streamChunkProcessor'
 import { getPersonProfileParser, resetPersonProfileParser } from '@/utils/personProfileParser'
 import { ElMessage } from 'element-plus'
@@ -19,6 +26,16 @@ import {
   deleteConversation,
   updateConversation,
 } from '@/utils/historyChatList'
+import { groupChatHistoryApi } from '@/api/groupChatHistory'
+
+interface GroupLiveTask extends GroupTask {
+  streamText: string
+  modelName?: string
+  toolCount: number
+  purpose?: string
+}
+
+const GROUP_TASK_HISTORY_PREFIX = '__GROUP_TASK_META__:'
 
 export const useChatStore = defineStore('chat', () => {
   // 状态
@@ -35,6 +52,9 @@ export const useChatStore = defineStore('chat', () => {
   const abortController = ref<AbortController | null>(null)
   // ✅ 记录当前请求类型：'normal' 为普通问答，'function' 为功能 API
   const currentRequestType = ref<'normal' | 'function' | 'group'>('normal')
+  // 恢复令牌只保存在当前页面内存中，避免进入历史消息或浏览器持久化。
+  const groupResumeStates = new Map<string, { runId: string; token: string }>()
+  const groupLiveTasks = ref<GroupLiveTask[]>([])
 
   // 敏感词警告弹窗状态
   const sensitiveWarning = ref<{
@@ -408,6 +428,10 @@ export const useChatStore = defineStore('chat', () => {
   const isVisibleGroupMessage = (message: GroupMessage) =>
     message.message_type !== 'manager_plan' && message.metadata?.visible !== false
 
+  const isConversationGroupMessage = (message: GroupMessage) =>
+    isVisibleGroupMessage(message) &&
+    !['task_result', 'task_error'].includes(message.message_type)
+
   const mapGroupMessage = (
     message: GroupMessage,
     groupChat: GroupChatContext,
@@ -423,6 +447,7 @@ export const useChatStore = defineStore('chat', () => {
     senderName: message.sender_name || undefined,
     groupMessageType: message.message_type,
     groupRunStatus: runStatus,
+    groupRunId: message.run_id || undefined,
   })
 
   const mergeGroupMessages = (
@@ -433,7 +458,7 @@ export const useChatStore = defineStore('chat', () => {
   ) => {
     const existingIds = new Set(targetMessages.map((message) => message.id))
     groupMessages
-      .filter(isVisibleGroupMessage)
+      .filter(isConversationGroupMessage)
       .map((message) => mapGroupMessage(message, groupChat, runStatus))
       .forEach((message) => {
         if (!existingIds.has(message.id)) {
@@ -441,6 +466,47 @@ export const useChatStore = defineStore('chat', () => {
           existingIds.add(message.id)
         }
       })
+  }
+
+  const resolveGroupResumeState = async (
+    groupId: string,
+    targetMessages: Message[],
+  ): Promise<{ runId: string; token: string } | undefined> => {
+    const cached = groupResumeStates.get(groupId)
+    if (cached) return cached
+
+    let waitingRunId: string | undefined
+    for (let index = targetMessages.length - 1; index >= 0; index--) {
+      const message = targetMessages[index]
+      if (
+        message?.groupChat?.id === groupId &&
+        message.groupRunStatus === 'waiting_user' &&
+        message.groupRunId
+      ) {
+        waitingRunId = message.groupRunId
+        break
+      }
+    }
+
+    if (!waitingRunId) return undefined
+
+    const bundle = await multiAgentApi.getRun(waitingRunId)
+    if (bundle.run.status !== 'waiting_user' || !bundle.resume?.token) return undefined
+
+    const resumeState = { runId: bundle.run.id, token: bundle.resume.token }
+    groupResumeStates.set(groupId, resumeState)
+    return resumeState
+  }
+
+  const syncGroupResumeState = (groupId: string, bundle: RunBundle) => {
+    if (bundle.run.status === 'waiting_user' && bundle.resume?.token) {
+      groupResumeStates.set(groupId, {
+        runId: bundle.run.id,
+        token: bundle.resume.token,
+      })
+    } else {
+      groupResumeStates.delete(groupId)
+    }
   }
 
   // ✅ 停止流式传输
@@ -706,6 +772,7 @@ export const useChatStore = defineStore('chat', () => {
     currentRequestType.value = 'group'
     error.value = null
     abortController.value = new AbortController()
+    groupLiveTasks.value = []
 
     const user = getUser()
     if (!currentHistoryId.value) {
@@ -718,8 +785,9 @@ export const useChatStore = defineStore('chat', () => {
     const localMessageId = `group-user-${Date.now()}`
     const pendingMessageId = `group-pending-${Date.now()}`
     const localInsertionIndex = targetMessages.length
+    const groupStreamMessageIds = new Map<string, string>()
 
-    if (targetMessages.length === 0) {
+    if (targetMessages.length === 0 && !groupChat.recordId) {
       try {
         const now = Date.now()
         await saveConversation({
@@ -758,7 +826,7 @@ export const useChatStore = defineStore('chat', () => {
     saveCurrentChatToCache()
 
     const removeLocalMessages = () => {
-      for (const id of [localMessageId, pendingMessageId]) {
+      for (const id of [localMessageId, pendingMessageId, ...groupStreamMessageIds.values()]) {
         const index = targetMessages.findIndex((message) => message.id === id)
         if (index >= 0) targetMessages.splice(index, 1)
       }
@@ -783,14 +851,218 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     try {
+      const resumeState = await resolveGroupResumeState(groupChat.id, targetMessages)
+      const handleGroupSseEvent = (event: GroupSseEvent) => {
+        const payload =
+          event.data && !('run' in event.data)
+            ? (event.data as Record<string, unknown>)
+            : ({} as Record<string, unknown>)
+        const read = <T>(key: string, fallback?: T): T | undefined =>
+          (event[key] as T | undefined) ?? (payload[key] as T | undefined) ?? fallback
+        const purpose = read<string>('purpose')
+        const senderName =
+          read<string>('sender_name', read<string>('employee_name', groupChat.managerName)) ||
+          groupChat.managerName
+        const appendVisibleText = (
+          key: string,
+          fragment: string,
+          messageType: string,
+          usePendingMessage = false,
+        ) => {
+          if (!fragment) return
+          let streamMessageId = groupStreamMessageIds.get(key)
+          if (!streamMessageId) {
+            streamMessageId = usePendingMessage
+              ? pendingMessageId
+              : `group-stream-${messageType}-${read<string>('task_key', 'message')}-${Date.now()}`
+            groupStreamMessageIds.set(key, streamMessageId)
+            if (!usePendingMessage) {
+              const visibleMessage: Message = {
+                id: streamMessageId,
+                role: 'assistant',
+                content: '',
+                timestamp: Date.now(),
+                groupChat,
+                senderName,
+                groupMessageType: messageType,
+                groupRunStatus: 'running',
+              }
+              const pendingIndex = targetMessages.findIndex(
+                (message) => message.id === pendingMessageId,
+              )
+              if (messageType === 'task_assignment' && pendingIndex >= 0) {
+                targetMessages.splice(pendingIndex, 0, visibleMessage)
+              } else {
+                targetMessages.push(visibleMessage)
+              }
+            }
+          }
+          const streamMessage = targetMessages.find((message) => message.id === streamMessageId)
+          if (streamMessage) {
+            streamMessage.content += fragment
+            streamMessage.senderName = senderName
+            streamMessage.groupMessageType = messageType
+          }
+          streamTick.value++
+        }
+        if (event.type === 'final') return
+        if ((event.type === 'text' || event.type === 'process_text') && purpose === 'final_summary') {
+          const fragment = read<string>('sentence', read<string>('text', '')) || ''
+          appendVisibleText('final_summary', fragment, 'final', true)
+          return
+        }
+        if (event.type === 'text' && purpose === 'task_assignment') {
+          const fragment = read<string>('sentence', read<string>('text', '')) || ''
+          const assignmentKey =
+            read<string>('task_key') ||
+            read<string>('assignee_employee_id', read<string>('assignee_name', 'assignment')) ||
+            'assignment'
+          appendVisibleText(`task_assignment:${assignmentKey}`, fragment, 'task_assignment')
+          return
+        }
+        const taskKey = read<string>('task_key')
+        const compatibilityEmployeeId = read<string>('employee_id')
+        const senderEmployeeId = read<string>('sender_employee_id', compatibilityEmployeeId)
+        const eventEmployeeName =
+          read<string>('sender_name', read<string>('employee_name', '数字警员')) || '数字警员'
+        const employeeId =
+          event.type === 'task_assignment'
+            ? read<string>('assignee_employee_id', compatibilityEmployeeId || senderEmployeeId)
+            : senderEmployeeId
+        const employeeName =
+          event.type === 'task_assignment'
+            ? read<string>(
+                'assignee_name',
+                read<string>('employee_name', eventEmployeeName),
+              ) || eventEmployeeName
+            : eventEmployeeName
+        if (event.type === 'run_started') return
+        if (!taskKey && !employeeId) return
+
+        const key = taskKey || `${employeeId}-${read<number>('round_no', 0)}`
+        let task = groupLiveTasks.value.find((item) => item.task_key === key)
+        if (!task) {
+          task = {
+            id: read<string>('child_run_id', key) || key,
+            run_id: '',
+            round_no: read<number>('round_no', 0) || 0,
+            task_key: key,
+            employee_id: employeeId || '',
+            employee_name: employeeName,
+            instruction: read<string>('instruction', read<string>('purpose', '执行任务')) || '执行任务',
+            depends_on: read<string[]>('depends_on', []) || [],
+            status: 'queued',
+            result: null,
+            error: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            streamText: '',
+            toolCount: 0,
+            purpose: read<string>('purpose'),
+          }
+          groupLiveTasks.value.push(task)
+          task = groupLiveTasks.value[groupLiveTasks.value.length - 1]
+        }
+
+        if (employeeId) task.employee_id = employeeId
+        if (employeeName) task.employee_name = employeeName
+        const instruction = read<string>('instruction')
+        if (instruction) task.instruction = instruction
+        const dependsOn = read<string[]>('depends_on')
+        if (dependsOn) task.depends_on = dependsOn
+
+        if (event.type === 'task_assignment') task.status = 'queued'
+        if (event.type === 'model_text') {
+          task.status = 'running'
+          task.modelName = read<string>('model_name', read<string>('model'))
+        }
+        if (event.type === 'text' || event.type === 'process_text') {
+          task.status = 'running'
+          const fragment = read<string>('sentence', read<string>('text', '')) || ''
+          task.streamText = `${task.streamText}${fragment}`
+            .replace(/\r\n/g, '\n')
+            .replace(/\n[\t ]*\n+/g, '\n')
+          if (fragment) streamTick.value++
+        }
+        if (event.type === 'tool_call') {
+          task.status = 'running'
+          task.toolCount += 1
+        }
+        if (event.type === 'task_result') {
+          task.status = 'completed'
+          task.result = read<string>('text', read<string>('content', task.streamText)) || task.streamText
+        }
+        if (event.type === 'task_error') {
+          task.status = 'failed'
+          task.error = read<string>('text', '任务执行失败') || '任务执行失败'
+        }
+      }
       const bundle: RunBundle = await multiAgentApi.sendGroupMessage(
         groupChat.id,
         normalizedContent,
+        {
+          resumeToken: resumeState?.token,
+          signal: requestController.signal,
+          onEvent: handleGroupSseEvent,
+        },
       )
       if (requestController.signal.aborted) return
 
       removeLocalMessages()
       mergeGroupMessages(targetMessages, bundle.messages, groupChat, bundle.run.status)
+
+      syncGroupResumeState(groupChat.id, bundle)
+      groupLiveTasks.value = bundle.tasks.map((task) => {
+        const live = groupLiveTasks.value.find((item) => item.task_key === task.task_key)
+        return {
+          ...task,
+          streamText: live?.streamText || task.result || '',
+          modelName: live?.modelName,
+          toolCount: live?.toolCount || 0,
+          purpose: live?.purpose,
+        }
+      })
+
+      if (groupChat.recordId) {
+        const managerUid = Number(groupChat.managerEmployeeId)
+        const messageWrites = bundle.messages
+            .filter(
+              (message) =>
+                isConversationGroupMessage(message) &&
+                (message.sender_employee_id || Number.isFinite(managerUid)),
+            )
+            .map((message) =>
+              groupChatHistoryApi.addChatLog({
+                group_id: groupChat.recordId!,
+                member_uid: message.sender_employee_id
+                  ? Number(message.sender_employee_id)
+                  : managerUid,
+                member_name:
+                  message.sender_type === 'user' ? '用户' : message.sender_name || undefined,
+                content: message.content,
+                chat_time: message.created_at,
+              }),
+            )
+        const taskWrites = groupLiveTasks.value.flatMap((task) => {
+          const employeeUid = Number(task.employee_id)
+          const memberUid = Number.isFinite(employeeUid) ? employeeUid : managerUid
+          if (!Number.isFinite(memberUid)) return []
+          return [
+            groupChatHistoryApi.addChatLog({
+              group_id: groupChat.recordId!,
+              member_uid: memberUid,
+              member_name: task.employee_name,
+              content: `${GROUP_TASK_HISTORY_PREFIX}${JSON.stringify({
+                ...task,
+                run_id: bundle.run.id,
+              })}`,
+            }),
+          ]
+        })
+        await Promise.allSettled(
+          [...messageWrites, ...taskWrites],
+        )
+      }
 
       const hasUserMessage = bundle.messages.some(
         (message) => isVisibleGroupMessage(message) && message.sender_type === 'user',
@@ -803,6 +1075,7 @@ export const useChatStore = defineStore('chat', () => {
           timestamp: Date.now(),
           groupChat,
           groupRunStatus: bundle.run.status,
+          groupRunId: bundle.run.id,
         })
       }
 
@@ -822,12 +1095,15 @@ export const useChatStore = defineStore('chat', () => {
             senderName: groupChat.managerName,
             groupMessageType: 'task_error',
             groupRunStatus: 'failed',
+            groupRunId: bundle.run.id,
           })
         }
         ElMessage.error(bundle.run.error || '本轮群聊执行失败')
       }
 
-      await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      if (!groupChat.recordId) {
+        await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      }
       finishGroupRequest()
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -836,9 +1112,37 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       removeLocalMessages()
+      let recoveredRun: RunBundle | null = null
       try {
         const latestMessages = await multiAgentApi.getGroupMessages(groupChat.id)
-        mergeGroupMessages(targetMessages, latestMessages, groupChat)
+        if (err instanceof MultiAgentApiError && err.status === 409) {
+          let latestRunId: string | undefined
+          for (let index = latestMessages.length - 1; index >= 0; index--) {
+            const message = latestMessages[index]
+            if (message?.run_id) {
+              latestRunId = message.run_id
+              break
+            }
+          }
+          if (latestRunId) {
+            recoveredRun = await multiAgentApi.getRun(latestRunId)
+            syncGroupResumeState(groupChat.id, recoveredRun)
+          }
+        }
+        mergeGroupMessages(
+          targetMessages,
+          latestMessages,
+          groupChat,
+          recoveredRun?.run.status,
+        )
+        if (recoveredRun) {
+          mergeGroupMessages(
+            targetMessages,
+            recoveredRun.messages,
+            groupChat,
+            recoveredRun.run.status,
+          )
+        }
       } catch {
         targetMessages.push({
           id: localMessageId,
@@ -851,6 +1155,7 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       const errorMessage = err instanceof Error ? err.message : '群聊请求失败'
+      const recoveredStatus = recoveredRun?.run.status
       targetMessages.push({
         id: `group-error-${Date.now()}`,
         role: 'assistant',
@@ -859,10 +1164,13 @@ export const useChatStore = defineStore('chat', () => {
         groupChat,
         senderName: groupChat.managerName,
         groupMessageType: 'task_error',
-        groupRunStatus: 'failed',
+        groupRunStatus: recoveredStatus || 'failed',
+        groupRunId: recoveredRun?.run.id,
       })
       error.value = errorMessage
-      await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      if (!groupChat.recordId) {
+        await saveConversationSnapshot(requestHistoryId, user, targetMessages).catch(() => {})
+      }
       finishGroupRequest()
       ElMessage.error(errorMessage)
     }
@@ -893,6 +1201,65 @@ export const useChatStore = defineStore('chat', () => {
       })
       await refreshHistoryList()
     } catch (err) {
+    }
+  }
+
+  const loadRecordedGroupHistory = async (groupId: number) => {
+    isLoading.value = true
+    groupLiveTasks.value = []
+    try {
+      const [detail, logs] = await Promise.all([
+        groupChatHistoryApi.detail(groupId),
+        groupChatHistoryApi.chatLog(groupId),
+      ])
+      const roomIdPrefix = 'multi-agent-group-id:'
+      const roomId = detail.announcement?.startsWith(roomIdPrefix)
+        ? detail.announcement.slice(roomIdPrefix.length).trim()
+        : ''
+      const fallbackManager = detail.members?.[0]
+      const groupChat: GroupChatContext = {
+        id: roomId || `record-${groupId}`,
+        recordId: groupId,
+        name: detail.group_name,
+        purpose: detail.remark || detail.announcement || '群聊历史',
+        managerEmployeeId: fallbackManager ? String(fallbackManager.member_uid) : '',
+        managerName: fallbackManager?.member_nickname || fallbackManager?.member_name || '群成员',
+        members: (detail.members || []).map((member) => ({
+          id: String(member.member_uid),
+          name: member.member_nickname || member.member_name,
+          description: member.member_remark,
+          isManager: false,
+        })),
+      }
+      const restoredTasks = new Map<string, GroupLiveTask>()
+      logs.forEach((log) => {
+        if (!log.content.startsWith(GROUP_TASK_HISTORY_PREFIX)) return
+        try {
+          const task = JSON.parse(log.content.slice(GROUP_TASK_HISTORY_PREFIX.length)) as GroupLiveTask
+          if (task.id && task.task_key) restoredTasks.set(task.id, task)
+        } catch {
+          // 忽略无法解析的旧任务元数据，不影响群聊消息恢复。
+        }
+      })
+      groupLiveTasks.value = Array.from(restoredTasks.values())
+      messages.value = logs
+        .filter((log) => !log.content.startsWith(GROUP_TASK_HISTORY_PREFIX))
+        .map((log) => ({
+        id: `group-log-${log.id}`,
+        role: log.member_name === '用户' ? ('user' as const) : ('assistant' as const),
+        content: log.content,
+        timestamp: Number.isNaN(Date.parse(log.chat_time)) ? Date.now() : Date.parse(log.chat_time),
+        groupChat,
+        senderName: log.member_name,
+        groupMessageType: 'history',
+        groupRunStatus: 'completed' as const,
+        }))
+      currentHistoryId.value = `group:${groupId}`
+      isTyping.value = false
+      isStreaming.value = false
+      isCompleteChat.value = true
+    } finally {
+      isLoading.value = false
     }
   }
   const saveAndClearMessages = async () => {
@@ -934,6 +1301,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 清空缓存池和输入缓存
     chatCache.clear()
+    groupResumeStates.clear()
     unreadHistoryIds.value = new Set()
     tempInputs.clear()
 
@@ -993,7 +1361,9 @@ export const useChatStore = defineStore('chat', () => {
     isHistoryRefreshing.value = true
     try {
       const list = await getConversationList({ limit })
-      historyList.value = list.map((item: any) => {
+      historyList.value = list
+        .filter((item: any) => !String(item.title || '').startsWith('群聊·'))
+        .map((item: any) => {
         const ts = item.updatedAt ? new Date(item.updatedAt) : new Date()
         const month = String(ts.getMonth() + 1).padStart(2, '0')
         const day = String(ts.getDate()).padStart(2, '0')
@@ -1028,7 +1398,9 @@ export const useChatStore = defineStore('chat', () => {
     isLoading.value = true
     try {
       const list = await getConversationList({ limit: newLimit })
-      historyList.value = list.map((item: any) => {
+      historyList.value = list
+        .filter((item: any) => !String(item.title || '').startsWith('群聊·'))
+        .map((item: any) => {
         const ts = item.updatedAt ? new Date(item.updatedAt) : new Date()
         const month = String(ts.getMonth() + 1).padStart(2, '0')
         const day = String(ts.getDate()).padStart(2, '0')
@@ -1246,6 +1618,7 @@ export const useChatStore = defineStore('chat', () => {
     uploadedFiles,
     abortController,
     currentRequestType,
+    groupLiveTasks,
     sendMessage,
     sendGroupMessage,
     saveAndClearMessages,
@@ -1256,6 +1629,7 @@ export const useChatStore = defineStore('chat', () => {
     loadMoreHistory,
     collapseHistoryList,
     loadHistory,
+    loadRecordedGroupHistory,
     createNewChat,
     resetAll,
     clearMessages,
